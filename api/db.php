@@ -5,6 +5,24 @@ $user = 'root';
 $pass = '';
 $dbname = 'auto';
 
+// Environment Flag Configuration: 'local' (lokal bot) atau 'production' (web online)
+if (!defined('APP_ENV')) {
+    define('APP_ENV', getenv('APP_ENV') ?: 'local'); // Ubah ke 'production' pada web online
+}
+
+if (!defined('IS_PRODUCTION')) {
+    define('IS_PRODUCTION', APP_ENV === 'production');
+}
+
+// Hardcoded Domain Target Tarik Data (Website Online)
+if (!defined('ONLINE_SYNC_URL')) {
+    define('ONLINE_SYNC_URL', getenv('ONLINE_SYNC_URL') ?: 'https://uremes.anamanimos.com');
+}
+
+if (!defined('ONLINE_SYNC_SECRET')) {
+    define('ONLINE_SYNC_SECRET', getenv('ONLINE_SYNC_SECRET') ?: 'wartik2026');
+}
+
 try {
     // 1. Connect without dbname to ensure database exists
     $pdoInit = new PDO("mysql:host=$host;charset=utf8mb4", $user, $pass, [

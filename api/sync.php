@@ -9,12 +9,13 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     exit;
 }
 
-$onlineUrl = trim($_POST['online_url'] ?? $_GET['online_url'] ?? '');
-$secretKey = trim($_POST['secret'] ?? $_GET['secret'] ?? 'wartik2026');
+// Gunakan hardcoded ONLINE_SYNC_URL jika tidak dikirim dalam POST
+$onlineUrl = trim($_POST['online_url'] ?? $_GET['online_url'] ?? ONLINE_SYNC_URL);
+$secretKey = trim($_POST['secret'] ?? $_GET['secret'] ?? ONLINE_SYNC_SECRET);
 
 if (!$onlineUrl) {
     http_response_code(400);
-    echo json_encode(['success' => false, 'message' => 'URL Website Online wajib diisi.']);
+    echo json_encode(['success' => false, 'message' => 'URL Website Online belum dikonfigurasi.']);
     exit;
 }
 
@@ -180,7 +181,7 @@ try {
     echo json_encode([
         'success' => true,
         'pulled_count' => $syncedCount,
-        'message' => "Berhasil menarik & mensinkronkan {$syncedCount} data pendaftaran dari server online ke database lokal!"
+        'message' => "Berhasil menarik & mensinkronkan {$syncedCount} data pendaftaran dari server online ({$onlineUrl}) ke database lokal!"
     ]);
 
 } catch (Exception $e) {
