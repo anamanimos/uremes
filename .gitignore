@@ -5,6 +5,7 @@ npm-debug.log*
 # Environment and sensitive data
 .env
 semeru_profile/
+chrome_profile/
 
 # Logs & Screenshots
 *.log
