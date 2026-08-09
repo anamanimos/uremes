@@ -16,7 +16,7 @@ if (!defined('IS_PRODUCTION')) {
 
 // Hardcoded Domain Target Tarik Data (Website Online)
 if (!defined('ONLINE_SYNC_URL')) {
-    define('ONLINE_SYNC_URL', getenv('ONLINE_SYNC_URL') ?: 'https://uremes.anamanimos.com');
+    define('ONLINE_SYNC_URL', getenv('ONLINE_SYNC_URL') ?: 'https://semeru.nams.my.id');
 }
 
 if (!defined('ONLINE_SYNC_SECRET')) {
