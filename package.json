@@ -1,0 +1,35 @@
+{
+  "name": "semeru-quota-checker",
+  "version": "1.0.0",
+  "description": "Automasi Cek Kuota & Auto Booking Semeru / Ranu Regulo 10 Orang dengan Notifikasi Telegram",
+  "main": "index.js",
+  "type": "commonjs",
+  "scripts": {
+    "start": "node auto-booking.js --destination=semeru",
+    "login": "node login.js",
+    "semeru": "node auto-booking.js --destination=semeru",
+    "ranu-regulo": "node auto-booking.js --destination=ranu-regulo",
+    "auto-booking": "node auto-booking.js --destination=semeru",
+    "cron": "node cron.js",
+    "test-telegram": "node telegram.js"
+  },
+  "keywords": [
+    "semeru",
+    "ranu-regulo",
+    "kuota",
+    "puppeteer",
+    "telegram-bot",
+    "automation",
+    "auto-booking"
+  ],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "dotenv": "^16.4.5",
+    "mysql2": "^3.23.2",
+    "node-cron": "^3.0.3",
+    "puppeteer": "^22.15.0",
+    "puppeteer-extra": "^3.3.6",
+    "puppeteer-extra-plugin-stealth": "^2.11.2"
+  }
+}
