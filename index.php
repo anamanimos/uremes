@@ -765,9 +765,7 @@
                     { id: 'f_j4d', name: 'Tanggal Lahir' },
                     { id: 'f_m2q', name: 'No HP' },
                     { id: 'f_w6s', name: 'Alamat Lengkap' },
-                    { id: 'f_q7y', name: 'Metode Pembayaran' },
-                    { id: 'tracking_hp', name: 'No HP Tracking' },
-                    { id: 'tracking_pin', name: 'PIN Tracking' }
+                    { id: 'f_q7y', name: 'Metode Pembayaran' }
                 ];
 
                 for (let field of requiredFields) {
@@ -806,9 +804,13 @@
             }
 
             function collectData(bookingId, targetDate, arrivalDate) {
+                const mainHp = document.getElementById('f_m2q').value.trim();
+                const trackingHpInput = document.getElementById('tracking_hp').value.trim();
+                const trackingPinInput = document.getElementById('tracking_pin').value.trim();
+
                 const customer = {
                     n_m: document.getElementById('f_x7a').value,
-                    h_p: document.getElementById('f_m2q').value,
+                    h_p: mainHp,
                     i_n: document.getElementById('f_v8n').value,
                     b_d: document.getElementById('f_j4d').value,
                     a_d: document.getElementById('f_w6s').value,
@@ -818,8 +820,8 @@
                     i_t: document.getElementById('f_h1b').value,
                     c_r: document.getElementById('f_c8z').value,
                     b_k: document.getElementById('f_q7y').value,
-                    t_hp: document.getElementById('tracking_hp').value,
-                    t_pn: document.getElementById('tracking_pin').value
+                    t_hp: trackingHpInput || mainHp,
+                    t_pn: trackingPinInput || '123456'
                 };
 
                 const members = [];
