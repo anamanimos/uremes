@@ -106,8 +106,14 @@ foreach ($bookings as $row) {
                 </div>
             </div>
 
-            <div class="flex items-center gap-3">
-                <a href="./index.php" class="bg-brand-500 hover:bg-brand-600 text-white font-semibold px-5 py-2.5 rounded-xl shadow-md transition-all flex items-center gap-2 text-sm">
+            <div class="flex flex-wrap items-center gap-3">
+                <!-- Tombol Tarik Data Online -->
+                <button type="button" onclick="openSyncOnlineModal()" class="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold px-5 py-2.5 rounded-xl shadow-md shadow-indigo-500/20 transition-all flex items-center gap-2 text-sm">
+                    <i class="fas fa-cloud-download-alt text-base"></i> Tarik Data Online
+                </button>
+
+                <!-- Tombol Form Booking Baru -->
+                <a href="./index.php" class="bg-brand-500 hover:bg-brand-600 text-white font-semibold px-5 py-2.5 rounded-xl shadow-md shadow-brand-500/20 transition-all flex items-center gap-2 text-sm">
                     <i class="fas fa-plus-circle"></i> Form Booking Baru
                 </a>
             </div>
@@ -276,6 +282,95 @@ foreach ($bookings as $row) {
                 }
             });
         });
+
+        // Handler Tarik Data Online -> Lokal
+        async function openSyncOnlineModal() {
+            const lastSavedUrl = localStorage.getItem('onlineWebUrl') || '';
+            const lastSecretKey = localStorage.getItem('onlineSecretKey') || 'wartik2026';
+
+            const { value: formValues } = await Swal.fire({
+                title: '☁️ Tarik Data Booking Online',
+                html: `
+                    <div class="text-left space-y-4 text-sm mt-2">
+                        <p class="text-slate-500">Masukkan URL website tempat pelanggan mendaftar secara online untuk menarik data ke database lokal.</p>
+                        <div>
+                            <label class="block font-semibold text-slate-700 mb-1">URL Website Online</label>
+                            <input id="swal-online-url" class="swal2-input !w-full !m-0" placeholder="https://domain-online-anda.com" value="${lastSavedUrl}">
+                        </div>
+                        <div>
+                            <label class="block font-semibold text-slate-700 mb-1">Secret Key (Keamanan)</label>
+                            <input id="swal-secret-key" type="password" class="swal2-input !w-full !m-0" placeholder="wartik2026" value="${lastSecretKey}">
+                        </div>
+                    </div>
+                `,
+                focusConfirm: false,
+                showCancelButton: true,
+                confirmButtonText: '<i class="fas fa-cloud-download-alt mr-1"></i> Tarik Data Sekarang',
+                cancelButtonText: 'Batal',
+                confirmButtonColor: '#4f46e5',
+                cancelButtonColor: '#94a3b8',
+                preConfirm: () => {
+                    const url = document.getElementById('swal-online-url').value.trim();
+                    const secret = document.getElementById('swal-secret-key').value.trim();
+                    if (!url) {
+                        Swal.showValidationMessage('URL Website Online wajib diisi!');
+                        return false;
+                    }
+                    return { url, secret };
+                }
+            });
+
+            if (formValues) {
+                const { url, secret } = formValues;
+
+                // Simpan URL & secret key di localStorage agar tidak usah mengetik ulang
+                localStorage.setItem('onlineWebUrl', url);
+                localStorage.setItem('onlineSecretKey', secret);
+
+                // Tampilkan Loading Spinner
+                Swal.fire({
+                    title: 'Sedang Menarik Data...',
+                    text: 'Terhubung ke server online dan mensinkronkan ke database lokal...',
+                    allowOutsideClick: false,
+                    didOpen: () => {
+                        Swal.showLoading();
+                    }
+                });
+
+                try {
+                    const formData = new FormData();
+                    formData.append('online_url', url);
+                    formData.append('secret', secret);
+
+                    const response = await fetch('./api/sync.php', {
+                        method: 'POST',
+                        body: formData
+                    });
+
+                    const res = await response.json();
+
+                    if (response.ok && res.success) {
+                        Swal.fire({
+                            icon: 'success',
+                            title: 'Sinkronisasi Berhasil!',
+                            html: `<p>${res.message}</p><p class="mt-2 text-xs font-semibold text-indigo-600 bg-indigo-50 py-1.5 px-3 rounded-lg inline-block">Siap dijalankan oleh Bot Lokal!</p>`,
+                            confirmButtonColor: '#10b981'
+                        }).then(() => {
+                            window.location.reload();
+                        });
+                    } else {
+                        throw new Error(res.message || 'Gagal menarik data dari server online.');
+                    }
+                } catch (err) {
+                    Swal.fire({
+                        icon: 'error',
+                        title: 'Gagal Sinkronisasi',
+                        text: err.message,
+                        confirmButtonColor: '#10b981'
+                    });
+                }
+            }
+        }
 
         // Quick Change Status AJAX Handler
         async function changeBookingStatus(bookingId, selectEl) {
