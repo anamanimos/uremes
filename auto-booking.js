@@ -225,7 +225,7 @@ async function runAutoBookingFlow() {
     await page.setViewport({ width: 1366, height: 768 });
 
     // 🚀 OPTIMASI PERFORMA KILAT (5x-10x Lebih Cepat):
-    // Blokir gambar berat, video background, font besar, dan tracking script yang memperlambat Puppeteer
+    // Blokir gambar berat, video background, dan tracking script
     await page.setRequestInterception(true);
     page.on('request', (req) => {
         const resourceType = req.resourceType();
@@ -234,24 +234,31 @@ async function runAutoBookingFlow() {
         if (
             resourceType === 'image' || 
             resourceType === 'media' || 
-            resourceType === 'font' ||
             url.includes('google-analytics') ||
             url.includes('googletagmanager') ||
             url.includes('facebook') ||
-            url.includes('doubleclick') ||
-            url.includes('fontawesome')
+            url.includes('doubleclick')
         ) {
-            req.abort();
+            req.abort().catch(() => {});
         } else {
-            req.continue();
+            req.continue().catch(() => {});
         }
     });
 
     try {
-        // Step 1: Navigasi ke Website Utama (Kilat tanpa gambar/media)
-        console.log(`📍 Step 1: Membuka website target (Speed-Optimized Mode): ${targetUrl}`);
+        // Step 1: Navigasi ke Website Utama
+        console.log(`📍 Step 1: Membuka website target: ${targetUrl}`);
         await page.goto(targetUrl, { waitUntil: 'domcontentloaded', timeout: 30000 }).catch(() => {});
-        await new Promise(r => setTimeout(r, 500));
+        
+        // Pastikan Halaman Sudah Berhasil Terbuka (Tidak Stuck di about:blank)
+        if (page.url() === 'about:blank') {
+            console.log('🔄 Memuat ulang halaman target...');
+            await page.goto(targetUrl, { waitUntil: 'domcontentloaded', timeout: 30000 }).catch(() => {});
+        }
+
+        // Menunggu Elemen Tab Dimuat di DOM
+        await page.waitForSelector('#pills-two-example2-tab, #pills-three-example2-tab, form', { timeout: 15000 }).catch(() => {});
+        await new Promise(r => setTimeout(r, 1000));
 
         // Step 2: Berpindah ke Tab Destinasi (Semeru / Ranu Regulo)
         await switchToDestinationTab(page, destination);
