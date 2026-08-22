@@ -758,7 +758,81 @@ async function runAutoBookingFlow() {
 
         await new Promise(r => setTimeout(r, 200));
 
-        // 7c. Cek Anggota yang Sudah Ada di Tabel TNBTS secara Presisi Nama/NIK
+        // 🧹 AUTO-CLEANER: Hapus Otomatis Baris Anggota yang Ganda / Duplikat di Tabel TNBTS
+        const cleanDuplicatesOnPage = async () => {
+            let hasDuplicates = true;
+            let cleanedCount = 0;
+
+            while (hasDuplicates) {
+                const result = await page.evaluate(() => {
+                    const rows = Array.from(document.querySelectorAll('table tbody tr'));
+                    const seen = new Set();
+                    let dupTr = null;
+                    let dupName = '';
+
+                    for (const tr of rows) {
+                        const tds = tr.querySelectorAll('td, th');
+                        if (tds.length < 2) continue;
+
+                        const nameCell = tds[0];
+                        const nameText = nameCell.innerText.trim().toLowerCase();
+                        if (!nameText || nameText.includes('no data available')) continue;
+
+                        if (seen.has(nameText)) {
+                            dupTr = tr;
+                            dupName = tds[0].innerText.trim();
+                            break;
+                        } else {
+                            seen.add(nameText);
+                        }
+                    }
+
+                    if (dupTr) {
+                        // Cari tombol hapus kuning / merah (fa-trash / btn-warning / btn-danger / btn-delete)
+                        const deleteBtn = dupTr.querySelector('.btn-delete, .btn-warning, .btn-danger, [data-action="delete"], a[href*="delete"]') ||
+                                          Array.from(dupTr.querySelectorAll('button, a')).find(b => b.querySelector('.fa-trash, .fa-trash-alt, .fa-times') || (b.innerText && (b.innerText.includes('Hapus') || b.innerText.includes('Delete'))));
+
+                        if (deleteBtn) {
+                            deleteBtn.click();
+                            return { found: true, name: dupName };
+                        }
+                    }
+
+                    return { found: false };
+                });
+
+                if (result && result.found) {
+                    cleanedCount++;
+                    console.log(`   🗑️ [AUTO-DELETE DUPLIKAT] Menghapus data ganda: "${result.name}" dari tabel TNBTS...`);
+                    await new Promise(r => setTimeout(r, 600));
+
+                    // Tekan OK / Ya / Hapus jika muncul konfirmasi popup modal / SweetAlert
+                    await page.evaluate(() => {
+                        const btns = Array.from(document.querySelectorAll('button, a'));
+                        const okBtn = btns.find(b => b.innerText && (
+                            b.innerText.trim().toUpperCase() === 'YA' ||
+                            b.innerText.trim().toUpperCase() === 'OK' ||
+                            b.innerText.trim().toUpperCase() === 'HAPUS' ||
+                            b.innerText.trim().toUpperCase() === 'CONFIRM' ||
+                            b.innerText.toLowerCase().includes('ya, hapus') ||
+                            b.innerText.toLowerCase().includes('yes, delete')
+                        ));
+                        if (okBtn) okBtn.click();
+                    });
+                    await new Promise(r => setTimeout(r, 800));
+                } else {
+                    hasDuplicates = false;
+                }
+            }
+
+            if (cleanedCount > 0) {
+                console.log(`✨ [AUTO-CLEANER] Sukses menghapus ${cleanedCount} baris anggota duplikat di tabel TNBTS!`);
+            }
+        };
+
+        // 7c. Cek & Bersihkan Duplikasi Anggota yang Sudah Ada di Tabel TNBTS
+        await cleanDuplicatesOnPage();
+
         const getExistingMembersOnPage = async () => {
             return await page.evaluate(() => {
                 const rows = Array.from(document.querySelectorAll('table tbody tr'));
@@ -1020,8 +1094,9 @@ async function runAutoBookingFlow() {
 
                 await new Promise(r => setTimeout(r, 600));
             }
+            await cleanDuplicatesOnPage();
             console.log(`\n==================================================`);
-            console.log(`✅ Seluruh ${memberList.length} anggota pendaftaran berhasil diproses!`);
+            console.log(`✅ Seluruh ${memberList.length} anggota pendaftaran berhasil diproses & dibersihkan dari duplikasi!`);
             console.log(`==================================================`);
         } else {
             console.log('✅ Anggota sudah lengkap tersimpan di tabel TNBTS!');
