@@ -715,7 +715,11 @@ async function runAutoBookingFlow() {
             }
         }, ketuaData);
 
-        await new Promise(r => setTimeout(r, 1200));
+        // Wait dynamically for Kota/Kabupaten options to populate
+        await page.waitForFunction(() => {
+            const distSel = document.querySelector('select[name="id_district"], select[name="id_regency"], select[name="id_city"], select[name="kota"], select[name="district_id"]');
+            return distSel && distSel.options.length > 1;
+        }, { timeout: 2000 }).catch(() => {});
 
         // Select Kota/Kabupaten (districts loaded via AJAX)
         await page.evaluate((k) => {
@@ -737,7 +741,7 @@ async function runAutoBookingFlow() {
             }
         }, ketuaData);
 
-        await new Promise(r => setTimeout(r, 1000));
+        await new Promise(r => setTimeout(r, 200));
 
         // 7c. Cek Jumlah Anggota yang Sudah Ada di Tabel
         const existingMembers = await page.evaluate(() => {
@@ -782,7 +786,8 @@ async function runAutoBookingFlow() {
                     });
                 });
 
-                await new Promise(r => setTimeout(r, 1200));
+                await page.waitForSelector('#modal_anggota.show, .modal.show', { timeout: 2000 }).catch(() => {});
+                await new Promise(r => setTimeout(r, 150));
 
                 console.log(`   📝 [2/4] Mengisikan Data Formulir Modal...`);
                 await page.evaluate((m, ketuaHp) => {
@@ -897,7 +902,7 @@ async function runAutoBookingFlow() {
                 }, member, ketuaData.hp);
 
                 console.log(`   💾 [3/4] Mengklik Tombol Simpan Modal...`);
-                await new Promise(r => setTimeout(r, 800));
+                await new Promise(r => setTimeout(r, 150));
 
                 console.log(`   ⏳ [4/4] Menunggu Modal Tertutup & Data Tersimpan...`);
                 await page.waitForFunction(() => {
@@ -905,7 +910,7 @@ async function runAutoBookingFlow() {
                     if (!modal) return true;
                     const style = window.getComputedStyle(modal);
                     return style.display === 'none' || !modal.classList.contains('show');
-                }, { timeout: 4000 }).catch(() => {});
+                }, { timeout: 3000 }).catch(() => {});
 
                 // Verifikasi Jumlah Baris di Tabel TNBTS & Auto Recovery
                 const newTableRowCount = await page.evaluate(() => {
@@ -928,10 +933,10 @@ async function runAutoBookingFlow() {
                             if (submitBtn) submitBtn.click();
                         }
                     });
-                    await new Promise(r => setTimeout(r, 1200));
+                    await new Promise(r => setTimeout(r, 500));
                 }
 
-                await new Promise(r => setTimeout(r, 1000));
+                await new Promise(r => setTimeout(r, 150));
             }
             console.log(`\n==================================================`);
             console.log(`✅ Seluruh ${memberList.length} anggota pendaftaran berhasil diinputkan!`);
