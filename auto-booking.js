@@ -246,18 +246,12 @@ async function runAutoBookingFlow() {
     });
 
     try {
-        // Step 1: Navigasi ke Website Utama
+        // Step 1: Navigasi ke Website Utama (Tunggu Alami tanpa Reload Paksa)
         console.log(`📍 Step 1: Membuka website target: ${targetUrl}`);
-        await page.goto(targetUrl, { waitUntil: 'domcontentloaded', timeout: 30000 }).catch(() => {});
+        await page.goto(targetUrl, { waitUntil: 'domcontentloaded', timeout: 45000 }).catch(() => {});
         
-        // Pastikan Halaman Sudah Berhasil Terbuka (Tidak Stuck di about:blank)
-        if (page.url() === 'about:blank') {
-            console.log('🔄 Memuat ulang halaman target...');
-            await page.goto(targetUrl, { waitUntil: 'domcontentloaded', timeout: 30000 }).catch(() => {});
-        }
-
-        // Menunggu Elemen Tab Dimuat di DOM
-        await page.waitForSelector('#pills-two-example2-tab, #pills-three-example2-tab, form', { timeout: 15000 }).catch(() => {});
+        // Menunggu Elemen Tab Dimuat di DOM secara Alami
+        await page.waitForSelector('#pills-two-example2-tab, #pills-three-example2-tab, form', { timeout: 30000 }).catch(() => {});
         await new Promise(r => setTimeout(r, 1000));
 
         // Step 2: Berpindah ke Tab Destinasi (Semeru / Ranu Regulo)
