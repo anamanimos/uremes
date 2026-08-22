@@ -317,6 +317,14 @@ async function runAutoBookingFlow() {
         }
     });
 
+    let last429Time = 0;
+    page.on('response', (response) => {
+        if (response.status() === 429) {
+            last429Time = Date.now();
+            console.log(`\n⚠️ [RATE LIMIT 429 DETECTED] Cloudflare/Server TNBTS membatasi kecepatan request (429 Too Many Requests). Bot akan melakukan jeda & retry otomatis...`);
+        }
+    });
+
     try {
         // Step 1: Navigasi ke Website Utama (Tunggu Alami tanpa Reload Paksa)
         console.log(`📍 Step 1: Membuka website target: ${targetUrl}`);
@@ -776,183 +784,197 @@ async function runAutoBookingFlow() {
                 console.log(`👤 [ANGGOTA ${memberNum}/${memberList.length}] Processing: ${member.nama}...`);
                 console.log(`   📂 NIK: ${member.identityNo} | Tgl Lahir: ${member.birthdate} | HP: ${member.hp}`);
 
-                console.log(`   🔘 [1/4] Membuka Modal Tambah Anggota ke-${memberNum}...`);
-                
-                await page.evaluate(() => {
-                    const openModal = document.querySelector('#modal_anggota.show, #modal_pengikut.show, .modal.show');
-                    if (openModal) {
-                        const closeBtn = openModal.querySelector('.close, [data-dismiss="modal"], button.btn-secondary');
-                        if (closeBtn) closeBtn.click();
-                        else openModal.classList.remove('show');
+                let isMemberSaved = false;
+
+                for (let retry = 1; retry <= 4; retry++) {
+                    // Jika terdeteksi Rate Limit 429 dalam 3 detik terakhir, berikan jeda aman 2.5 detik
+                    if (Date.now() - last429Time < 3000) {
+                        console.log(`   ⏳ [RATE LIMIT 429 RECOVERY] Jeda 2.5 detik untuk melewati limitasi server Cloudflare...`);
+                        await new Promise(r => setTimeout(r, 2500));
                     }
-                });
 
-                await page.click('.btn-add').catch(async () => {
+                    if (retry > 1) {
+                        console.log(`   🔄 [RETRY ${retry}/4] Mengulangi pengisian anggota ke-${memberNum}...`);
+                    }
+
+                    console.log(`   🔘 [1/4] Membuka Modal Tambah Anggota ke-${memberNum}...`);
+                    
                     await page.evaluate(() => {
-                        const btn = document.querySelector('.btn-add') || 
-                                    document.querySelector('[data-target*="modal"]') ||
-                                    document.querySelector('[data-toggle="modal"]') ||
-                                    Array.from(document.querySelectorAll('button, a')).find(b => b.innerText && (b.innerText.includes('Tambah') || b.innerText.includes('Add')));
-                        if (btn) btn.click();
+                        const openModal = document.querySelector('#modal_anggota.show, #modal_pengikut.show, .modal.show');
+                        if (openModal) {
+                            const closeBtn = openModal.querySelector('.close, [data-dismiss="modal"], button.btn-secondary');
+                            if (closeBtn) closeBtn.click();
+                            else openModal.classList.remove('show');
+                        }
                     });
-                });
 
-                await page.waitForSelector('#modal_anggota.show, #modal_pengikut.show, .modal.show', { timeout: 2000 }).catch(() => {});
-                await new Promise(r => setTimeout(r, 150));
+                    await page.click('.btn-add').catch(async () => {
+                        await page.evaluate(() => {
+                            const btn = document.querySelector('.btn-add') || 
+                                        document.querySelector('[data-target*="modal"]') ||
+                                        document.querySelector('[data-toggle="modal"]') ||
+                                        Array.from(document.querySelectorAll('button, a')).find(b => b.innerText && (b.innerText.includes('Tambah') || b.innerText.includes('Add')));
+                            if (btn) btn.click();
+                        });
+                    });
 
-                console.log(`   📝 [2/4] Mengisikan Data Formulir Modal (${destTitle})...`);
-                await page.evaluate((m, ketuaHp) => {
-                    const modal = document.querySelector('#modal_anggota, #modal_pengikut, #modal-anggota, .modal.show, .modal');
-                    if (!modal) return;
+                    await page.waitForSelector('#modal_anggota.show, #modal_pengikut.show, .modal.show', { timeout: 2000 }).catch(() => {});
+                    await new Promise(r => setTimeout(r, 200));
 
-                    const setInputValue = (el, val) => {
-                        if (!el || !val) return;
-                        el.value = String(val);
-                        el.dispatchEvent(new Event('input', { bubbles: true }));
-                        el.dispatchEvent(new Event('change', { bubbles: true }));
-                        el.dispatchEvent(new Event('blur', { bubbles: true }));
-                        if (window.jQuery) {
-                            window.jQuery(el).trigger('input').trigger('change').trigger('blur');
-                        }
-                    };
+                    console.log(`   📝 [2/4] Mengisikan Data Formulir Modal (${destTitle})...`);
+                    await page.evaluate((m, ketuaHp) => {
+                        const modal = document.querySelector('#modal_anggota, #modal_pengikut, #modal-anggota, .modal.show, .modal');
+                        if (!modal) return;
 
-                    const setSelectValue = (el, val) => {
-                        if (!el || !val) return;
-                        el.value = String(val);
-                        el.dispatchEvent(new Event('change', { bubbles: true }));
-                        if (window.jQuery) {
-                            window.jQuery(el).trigger('change');
-                            if (window.jQuery(el).selectpicker) window.jQuery(el).selectpicker('refresh');
-                        }
-                    };
+                        const setInputValue = (el, val) => {
+                            if (!el || !val) return;
+                            el.value = String(val);
+                            el.dispatchEvent(new Event('input', { bubbles: true }));
+                            el.dispatchEvent(new Event('change', { bubbles: true }));
+                            el.dispatchEvent(new Event('blur', { bubbles: true }));
+                            if (window.jQuery) {
+                                window.jQuery(el).trigger('input').trigger('change').trigger('blur');
+                            }
+                        };
 
-                    // 1. Nama Pengikut
-                    const nameInp = modal.querySelector('input[name="name"], input[name="nama"], input[name="nama_anggota"], input[name="nama_pengikut"]');
-                    setInputValue(nameInp, m.nama);
+                        const setSelectValue = (el, val) => {
+                            if (!el || !val) return;
+                            el.value = String(val);
+                            el.dispatchEvent(new Event('change', { bubbles: true }));
+                            if (window.jQuery) {
+                                window.jQuery(el).trigger('change');
+                                if (window.jQuery(el).selectpicker) window.jQuery(el).selectpicker('refresh');
+                            }
+                        };
 
-                    // 2. Tanggal Lahir (Dukungan Flatpickr Datepicker DD-MM-YYYY)
-                    const bdInp = modal.querySelector('input[name="birthdate"], input[name="tgl_lahir"], input[name="tanggal_lahir"]');
-                    if (bdInp) {
-                        const bDateVal = m.birthdate || '20-05-1995';
-                        if (bdInp._flatpickr) {
-                            try { bdInp._flatpickr.setDate(bDateVal, true, "d-m-Y"); } catch(e) {
-                                bdInp._flatpickr.setDate(bDateVal, true);
+                        // 1. Nama Pengikut
+                        const nameInp = modal.querySelector('input[name="name"], input[name="nama"], input[name="nama_anggota"], input[name="nama_pengikut"]');
+                        setInputValue(nameInp, m.nama);
+
+                        // 2. Tanggal Lahir (Dukungan Flatpickr Datepicker DD-MM-YYYY)
+                        const bdInp = modal.querySelector('input[name="birthdate"], input[name="tgl_lahir"], input[name="tanggal_lahir"]');
+                        if (bdInp) {
+                            const bDateVal = m.birthdate || '20-05-1995';
+                            if (bdInp._flatpickr) {
+                                try { bdInp._flatpickr.setDate(bDateVal, true, "d-m-Y"); } catch(e) {
+                                    bdInp._flatpickr.setDate(bDateVal, true);
+                                }
+                            }
+                            bdInp.removeAttribute('readonly');
+                            bdInp.removeAttribute('disabled');
+                            setInputValue(bdInp, bDateVal);
+                            if (bdInp.nextElementSibling && bdInp.nextElementSibling.classList.contains('flatpickr-input')) {
+                                bdInp.nextElementSibling.removeAttribute('readonly');
+                                bdInp.nextElementSibling.value = bDateVal;
+                            }
+                            if (window.jQuery && window.jQuery(bdInp).data && window.jQuery(bdInp).data('flatpickr')) {
+                                try { window.jQuery(bdInp).data('flatpickr').setDate(bDateVal, true, "d-m-Y"); } catch(e2) {}
                             }
                         }
-                        bdInp.removeAttribute('readonly');
-                        bdInp.removeAttribute('disabled');
-                        setInputValue(bdInp, bDateVal);
-                        if (bdInp.nextElementSibling && bdInp.nextElementSibling.classList.contains('flatpickr-input')) {
-                            bdInp.nextElementSibling.removeAttribute('readonly');
-                            bdInp.nextElementSibling.value = bDateVal;
+
+                        // 3. Jenis Kelamin
+                        const genderSel = modal.querySelector('select[name="id_gender"], select[name="gender"], select[name="jenis_kelamin"]');
+                        setSelectValue(genderSel, m.gender);
+
+                        // 4. Alamat
+                        const addrInp = modal.querySelector('input[name="address"], input[name="alamat"]');
+                        setInputValue(addrInp, m.address);
+
+                        // 5. Jenis Identitas
+                        const idTypeSel = modal.querySelector('select[name="id_identity"], select[name="jenis_identitas"], select[name="identity_type"]');
+                        setSelectValue(idTypeSel, m.identityType);
+
+                        // 6. NIK / No Identitas
+                        const idNoInp = modal.querySelector('input[name="identity_no"], input[name="no_identitas"], input[name="nik"], input[name="no_kartu_identitas"]');
+                        setInputValue(idNoInp, m.identityNo);
+
+                        const cleanPhone = (hpStr) => {
+                            if (!hpStr) return '081234567890';
+                            let cleaned = String(hpStr).replace(/[^0-9]/g, '');
+                            if (cleaned.startsWith('62')) cleaned = '0' + cleaned.slice(2);
+                            if (!cleaned.startsWith('0')) cleaned = '0' + cleaned;
+                            return cleaned;
+                        };
+
+                        // 7. No HP Anggota (Atribut Presisi: name="hp_member")
+                        const hpVal = cleanPhone(m.hp || m.familyHp || ketuaHp || '081234567890');
+                        const hpInp = modal.querySelector('input[name="hp_member"], input[name="hp"], input[name="no_hp_anggota"], input[name="hp_anggota"], input[name="phone_number"], input[name="no_hp"], input[name="phone"]');
+                        if (hpInp) {
+                            hpInp.removeAttribute('disabled');
+                            hpInp.removeAttribute('readonly');
+                            setInputValue(hpInp, hpVal);
+                        } else {
+                            const labels = Array.from(modal.querySelectorAll('label'));
+                            const targetLabel = labels.find(l => l.innerText && l.innerText.toLowerCase().includes('no hp anggota'));
+                            if (targetLabel) {
+                                const inp = targetLabel.parentElement.querySelector('input') || (targetLabel.nextElementSibling ? targetLabel.nextElementSibling.querySelector('input') : null);
+                                if (inp) setInputValue(inp, hpVal);
+                            }
                         }
-                        if (window.jQuery && window.jQuery(bdInp).data && window.jQuery(bdInp).data('flatpickr')) {
-                            try { window.jQuery(bdInp).data('flatpickr').setDate(bDateVal, true, "d-m-Y"); } catch(e2) {}
+
+                        // 8. No HP Keluarga (input[name="family_hp"])
+                        const famHpVal = cleanPhone(m.familyHp || m.hp || ketuaHp || '081299887766');
+                        const famHpInp = modal.querySelector('input[name="family_hp"], input[name="hp_keluarga"], input[name="no_hp_keluarga"]');
+                        setInputValue(famHpInp, famHpVal);
+
+                        // 9. Pekerjaan
+                        const jobSel = modal.querySelector('select[name="id_job"], select[name="job_id"], select[name="pekerjaan"]');
+                        setSelectValue(jobSel, m.jobId || 2);
+
+                        // 10. Negara
+                        const countrySel = modal.querySelector('select[name="id_country"], select[name="country"], select[name="negara"]');
+                        setSelectValue(countrySel, m.countryId || '99');
+
+                        // 11. Surat Keterangan Sehat (jika ada di modal Ranu Regulo / Semeru)
+                        const docSel = modal.querySelector('select[name="doctor_letter"], select[name="surat_sehat"], select[name="is_doctor_letter"]');
+                        if (docSel) setSelectValue(docSel, '1');
+
+                        // Klik Tombol Simpan
+                        const submitBtn = modal.querySelector('button[type="submit"]') || 
+                                          modal.querySelector('.btn-primary') ||
+                                          Array.from(modal.querySelectorAll('button')).find(b => b.innerText && (b.innerText.includes('Simpan') || b.innerText.includes('Tambah') || b.innerText.includes('Submit')));
+                        if (submitBtn) {
+                            submitBtn.click();
                         }
-                    }
+                    }, member, ketuaData.hp);
 
-                    // 3. Jenis Kelamin
-                    const genderSel = modal.querySelector('select[name="id_gender"], select[name="gender"], select[name="jenis_kelamin"]');
-                    setSelectValue(genderSel, m.gender);
+                    console.log(`   💾 [3/4] Mengklik Tombol Simpan Modal...`);
+                    await new Promise(r => setTimeout(r, 600));
 
-                    // 4. Alamat
-                    const addrInp = modal.querySelector('input[name="address"], input[name="alamat"]');
-                    setInputValue(addrInp, m.address);
+                    console.log(`   ⏳ [4/4] Menunggu Modal Tertutup & Data Tersimpan...`);
+                    await page.waitForFunction(() => {
+                        const modal = document.querySelector('#modal_anggota, #modal_pengikut, .modal.show');
+                        if (!modal) return true;
+                        const style = window.getComputedStyle(modal);
+                        return style.display === 'none' || !modal.classList.contains('show');
+                    }, { timeout: 3000 }).catch(() => {});
 
-                    // 5. Jenis Identitas
-                    const idTypeSel = modal.querySelector('select[name="id_identity"], select[name="jenis_identitas"], select[name="identity_type"]');
-                    setSelectValue(idTypeSel, m.identityType);
-
-                    // 6. NIK / No Identitas
-                    const idNoInp = modal.querySelector('input[name="identity_no"], input[name="no_identitas"], input[name="nik"], input[name="no_kartu_identitas"]');
-                    setInputValue(idNoInp, m.identityNo);
-
-                    const cleanPhone = (hpStr) => {
-                        if (!hpStr) return '081234567890';
-                        let cleaned = String(hpStr).replace(/[^0-9]/g, '');
-                        if (cleaned.startsWith('62')) cleaned = '0' + cleaned.slice(2);
-                        if (!cleaned.startsWith('0')) cleaned = '0' + cleaned;
-                        return cleaned;
-                    };
-
-                    // 7. No HP Anggota (Atribut Presisi: name="hp_member")
-                    const hpVal = cleanPhone(m.hp || m.familyHp || ketuaHp || '081234567890');
-                    const hpInp = modal.querySelector('input[name="hp_member"], input[name="hp"], input[name="no_hp_anggota"], input[name="hp_anggota"], input[name="phone_number"], input[name="no_hp"], input[name="phone"]');
-                    if (hpInp) {
-                        hpInp.removeAttribute('disabled');
-                        hpInp.removeAttribute('readonly');
-                        setInputValue(hpInp, hpVal);
-                    } else {
-                        const labels = Array.from(modal.querySelectorAll('label'));
-                        const targetLabel = labels.find(l => l.innerText && l.innerText.toLowerCase().includes('no hp anggota'));
-                        if (targetLabel) {
-                            const inp = targetLabel.parentElement.querySelector('input') || (targetLabel.nextElementSibling ? targetLabel.nextElementSibling.querySelector('input') : null);
-                            if (inp) setInputValue(inp, hpVal);
-                        }
-                    }
-
-                    // 8. No HP Keluarga (input[name="family_hp"])
-                    const famHpVal = cleanPhone(m.familyHp || m.hp || ketuaHp || '081299887766');
-                    const famHpInp = modal.querySelector('input[name="family_hp"], input[name="hp_keluarga"], input[name="no_hp_keluarga"]');
-                    setInputValue(famHpInp, famHpVal);
-
-                    // 9. Pekerjaan
-                    const jobSel = modal.querySelector('select[name="id_job"], select[name="job_id"], select[name="pekerjaan"]');
-                    setSelectValue(jobSel, m.jobId || 2);
-
-                    // 10. Negara
-                    const countrySel = modal.querySelector('select[name="id_country"], select[name="country"], select[name="negara"]');
-                    setSelectValue(countrySel, m.countryId || '99');
-
-                    // 11. Surat Keterangan Sehat (jika ada di modal Ranu Regulo / Semeru)
-                    const docSel = modal.querySelector('select[name="doctor_letter"], select[name="surat_sehat"], select[name="is_doctor_letter"]');
-                    if (docSel) setSelectValue(docSel, '1');
-
-                    // Klik Tombol Simpan
-                    const submitBtn = modal.querySelector('button[type="submit"]') || 
-                                      modal.querySelector('.btn-primary') ||
-                                      Array.from(modal.querySelectorAll('button')).find(b => b.innerText && (b.innerText.includes('Simpan') || b.innerText.includes('Tambah') || b.innerText.includes('Submit')));
-                    if (submitBtn) {
-                        submitBtn.click();
-                    }
-                }, member, ketuaData.hp);
-
-                console.log(`   💾 [3/4] Mengklik Tombol Simpan Modal...`);
-                await new Promise(r => setTimeout(r, 150));
-
-                console.log(`   ⏳ [4/4] Menunggu Modal Tertutup & Data Tersimpan...`);
-                await page.waitForFunction(() => {
-                    const modal = document.querySelector('#modal_anggota, #modal_pengikut, .modal.show');
-                    if (!modal) return true;
-                    const style = window.getComputedStyle(modal);
-                    return style.display === 'none' || !modal.classList.contains('show');
-                }, { timeout: 3000 }).catch(() => {});
-
-                // Verifikasi Jumlah Baris di Tabel TNBTS & Auto Recovery
-                const newTableRowCount = await page.evaluate(() => {
-                    const rows = Array.from(document.querySelectorAll('table tbody tr'));
-                    return rows.filter(tr => tr.innerText.trim() && !tr.innerText.includes('No data available') && tr.querySelectorAll('td').length >= 2).length;
-                });
-
-                if (newTableRowCount > existingMembers + i) {
-                    console.log(`   ✅ [ANGGOTA ${memberNum}/${memberList.length}] SUKSES TERINPUT & MUNCUL DI TABEL! (Total di Tabel: ${newTableRowCount} Anggota)`);
-                } else {
-                    console.log(`   ⚠️ [ANGGOTA ${memberNum}/${memberList.length}] Tabel belum bertambah. Menutup popup error & mencoba kembali...`);
-                    await page.evaluate(() => {
-                        const btns = Array.from(document.querySelectorAll('button'));
-                        const closeBtn = btns.find(b => b.innerText && (b.innerText.trim() === 'Close' || b.innerText.trim() === 'Tutup' || b.innerText.trim() === 'OK'));
-                        if (closeBtn) closeBtn.click();
-
-                        const modal = document.querySelector('#modal_anggota.show, .modal.show');
-                        if (modal) {
-                            const submitBtn = modal.querySelector('button[type="submit"]') || Array.from(modal.querySelectorAll('button')).find(b => b.innerText && (b.innerText.includes('Simpan') || b.innerText.includes('Tambah')));
-                            if (submitBtn) submitBtn.click();
-                        }
+                    // Verifikasi Jumlah Baris di Tabel TNBTS & Auto Recovery
+                    const newTableRowCount = await page.evaluate(() => {
+                        const rows = Array.from(document.querySelectorAll('table tbody tr'));
+                        return rows.filter(tr => tr.innerText.trim() && !tr.innerText.includes('No data available') && tr.querySelectorAll('td').length >= 2).length;
                     });
-                    await new Promise(r => setTimeout(r, 500));
+
+                    if (newTableRowCount > existingMembers + i) {
+                        console.log(`   ✅ [ANGGOTA ${memberNum}/${memberList.length}] SUKSES TERINPUT & MUNCUL DI TABEL! (Total di Tabel: ${newTableRowCount} Anggota)`);
+                        isMemberSaved = true;
+                        break;
+                    } else {
+                        console.log(`   ⚠️ [ANGGOTA ${memberNum}/${memberList.length}] Tabel belum bertambah (Rate Limit / Delay Server). Retry ${retry}/4 dalam 2 detik...`);
+                        await page.evaluate(() => {
+                            const btns = Array.from(document.querySelectorAll('button'));
+                            const closeBtn = btns.find(b => b.innerText && (b.innerText.trim() === 'Close' || b.innerText.trim() === 'Tutup' || b.innerText.trim() === 'OK'));
+                            if (closeBtn) closeBtn.click();
+                        });
+                        await new Promise(r => setTimeout(r, 2000));
+                    }
                 }
 
-                await new Promise(r => setTimeout(r, 150));
+                if (!isMemberSaved) {
+                    console.log(`❌ [ANGGOTA ${memberNum}/${memberList.length}] GAGAL TERSIMPAN setelah 4 kali percobaan karena limitasi server.`);
+                }
+
+                await new Promise(r => setTimeout(r, 600));
             }
             console.log(`\n==================================================`);
             console.log(`✅ Seluruh ${memberList.length} anggota pendaftaran berhasil diinputkan!`);
