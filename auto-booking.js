@@ -276,8 +276,25 @@ async function runAutoBookingFlow() {
     browserInstance = browser;
 
     const pages = await browser.pages();
+    for (let i = 1; i < pages.length; i++) {
+        await pages[i].close().catch(() => {});
+    }
     const page = pages.length > 0 ? pages[0] : await browser.newPage();
     await page.setViewport({ width: 1366, height: 768 });
+
+    // Auto-dismiss popup 'Form tidak valid 1 tab' secara otomatis di latar belakang
+    await page.evaluateOnNewDocument(() => {
+        setInterval(() => {
+            const btns = Array.from(document.querySelectorAll('button'));
+            const closeBtn = btns.find(b => b.innerText && (b.innerText.trim() === 'Close' || b.innerText.trim() === 'Tutup' || b.innerText.trim() === 'OK'));
+            if (closeBtn) {
+                const popup = closeBtn.closest('.modal, .swal2-popup, div, section');
+                if (popup && popup.innerText && (popup.innerText.includes('1 tab') || popup.innerText.includes('Form tidak valid'))) {
+                    closeBtn.click();
+                }
+            }
+        }, 400);
+    });
 
     // 🚀 OPTIMASI PERFORMA KILAT (5x-10x Lebih Cepat):
     // Blokir gambar berat, video background, dan tracking script
@@ -890,7 +907,7 @@ async function runAutoBookingFlow() {
                     return style.display === 'none' || !modal.classList.contains('show');
                 }, { timeout: 4000 }).catch(() => {});
 
-                // Verifikasi Jumlah Baris di Tabel TNBTS
+                // Verifikasi Jumlah Baris di Tabel TNBTS & Auto Recovery
                 const newTableRowCount = await page.evaluate(() => {
                     const rows = Array.from(document.querySelectorAll('table tbody tr'));
                     return rows.filter(tr => tr.innerText.trim() && !tr.innerText.includes('No data available') && tr.querySelectorAll('td').length >= 3).length;
@@ -899,7 +916,19 @@ async function runAutoBookingFlow() {
                 if (newTableRowCount > existingMembers + i) {
                     console.log(`   ✅ [ANGGOTA ${memberNum}/${memberList.length}] SUKSES TERINPUT & MUNCUL DI TABEL! (Total di Tabel: ${newTableRowCount} Anggota)`);
                 } else {
-                    console.log(`   ⚠️ [ANGGOTA ${memberNum}/${memberList.length}] GAGAL TERSIMPAN DI TABEL. Memeriksa validasi form...`);
+                    console.log(`   ⚠️ [ANGGOTA ${memberNum}/${memberList.length}] Tabel belum bertambah. Menutup popup error & mencoba kembali...`);
+                    await page.evaluate(() => {
+                        const btns = Array.from(document.querySelectorAll('button'));
+                        const closeBtn = btns.find(b => b.innerText && (b.innerText.trim() === 'Close' || b.innerText.trim() === 'Tutup' || b.innerText.trim() === 'OK'));
+                        if (closeBtn) closeBtn.click();
+
+                        const modal = document.querySelector('#modal_anggota.show, .modal.show');
+                        if (modal) {
+                            const submitBtn = modal.querySelector('button[type="submit"]') || Array.from(modal.querySelectorAll('button')).find(b => b.innerText && (b.innerText.includes('Simpan') || b.innerText.includes('Tambah')));
+                            if (submitBtn) submitBtn.click();
+                        }
+                    });
+                    await new Promise(r => setTimeout(r, 1200));
                 }
 
                 await new Promise(r => setTimeout(r, 1000));
