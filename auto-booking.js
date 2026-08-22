@@ -182,18 +182,6 @@ async function runAutoBookingFlow() {
             }
         }
 
-        if (dbBooking.ketua) {
-            ketuaData = {
-                nama: dbBooking.ketua.nama || ketuaData.nama,
-                nik: dbBooking.ketua.identity_no || ketuaData.nik,
-                hp: dbBooking.ketua.hp || ketuaData.hp,
-                address: dbBooking.ketua.address || ketuaData.address,
-                gender: String(dbBooking.ketua.gender_id || 1),
-                identityType: String(dbBooking.ketua.identity_type_id || 1),
-                birthdate: formatDateToYYYYMMDD(dbBooking.ketua.birthdate || '1990-01-01')
-            };
-        }
-
         const formatDateToYYYYMMDD = (dateVal) => {
             if (!dateVal) return '1995-05-20';
             const strVal = String(dateVal).trim();
@@ -208,6 +196,18 @@ async function runAutoBookingFlow() {
             const day = String(d.getDate()).padStart(2, '0');
             return `${y}-${m}-${day}`;
         };
+
+        if (dbBooking.ketua) {
+            ketuaData = {
+                nama: dbBooking.ketua.nama || ketuaData.nama,
+                nik: dbBooking.ketua.identity_no || ketuaData.nik,
+                hp: dbBooking.ketua.hp || ketuaData.hp,
+                address: dbBooking.ketua.address || ketuaData.address,
+                gender: String(dbBooking.ketua.gender_id || 1),
+                identityType: String(dbBooking.ketua.identity_type_id || 1),
+                birthdate: formatDateToYYYYMMDD(dbBooking.ketua.birthdate || '1990-01-01')
+            };
+        }
 
         if (dbBooking.members) {
             memberList = dbBooking.members.map((m, i) => ({
