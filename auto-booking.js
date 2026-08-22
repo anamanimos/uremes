@@ -178,17 +178,32 @@ async function runAutoBookingFlow() {
             };
         }
 
+        const formatDateToYYYYMMDD = (dateVal) => {
+            if (!dateVal) return '1995-05-20';
+            const strVal = String(dateVal).trim();
+            if (/^\d{4}-\d{2}-\d{2}$/.test(strVal)) return strVal;
+            const d = new Date(dateVal);
+            if (isNaN(d.getTime())) {
+                if (strVal.includes('T')) return strVal.split('T')[0];
+                return '1995-05-20';
+            }
+            const y = d.getFullYear();
+            const m = String(d.getMonth() + 1).padStart(2, '0');
+            const day = String(d.getDate()).padStart(2, '0');
+            return `${y}-${m}-${day}`;
+        };
+
         if (dbBooking.members) {
             memberList = dbBooking.members.map((m, i) => ({
                 nama: m.nama,
                 gender: String(m.gender_id || 1),
                 identityType: String(m.identity_type_id || 1),
                 identityNo: m.identity_no || `350712345678900${i + 2}`,
-                birthdate: m.birthdate ? String(m.birthdate).split('T')[0] : '1995-05-20',
-                hp: m.hp || '08123456789' + (i + 1),
+                birthdate: formatDateToYYYYMMDD(m.birthdate),
+                hp: m.hp || m.family_hp || dbBooking.ketua?.hp || ('08123456789' + (i + 1)),
                 address: m.address || 'Jl. Raya No. ' + (i + 1),
                 jobId: String(m.job_id || 2),
-                familyHp: m.family_hp || '081299887766',
+                familyHp: m.family_hp || m.hp || dbBooking.ketua?.hp || '081299887766',
                 countryId: String(m.country_id || 99)
             }));
         }
@@ -480,8 +495,9 @@ async function runAutoBookingFlow() {
         // Step 7: Isi Form Booking dengan Data Ketua & Anggota (JUMLAH ANGGOTA DINAMIS)
         console.log(`📝 Step 7: Mengisi Data Form Booking ${destTitle}...`);
 
-        // 7a. Select Pintu Masuk (Ranupani / Single Gate Safety Check)
-        await page.evaluate(() => {
+        // 7a. Select Pintu Masuk, Select Pendamping, dan Verifikasi Tanggal Berangkat & Pulang
+        await page.evaluate((rawDate, ketuaHp) => {
+            // 1. Pintu Masuk
             const gateSel = document.querySelector('select[name="id_gate"], select[name="pintu_masuk"]') || 
                             document.querySelector('select[name*="gate"]') ||
                             document.querySelector('select[name*="pintu"]');
@@ -494,7 +510,75 @@ async function runAutoBookingFlow() {
                 }
                 gateSel.dispatchEvent(new Event('change', { bubbles: true }));
             }
-        });
+
+            // 2. Pilih Pendamping (Tanpa Pendamping / Dengan Pendamping)
+            const pendampingSel = document.querySelector('select[name="pendamping"], select[name="id_pendamping"], select[name="status_pendamping"], select[name="is_pendamping"], select[name="pendamping_id"]');
+            if (pendampingSel) {
+                const tanpaIdx = Array.from(pendampingSel.options).findIndex(o => o.text && o.text.toLowerCase().includes('tanpa'));
+                if (tanpaIdx !== -1) {
+                    pendampingSel.selectedIndex = tanpaIdx;
+                } else if (pendampingSel.options.length > 1) {
+                    pendampingSel.selectedIndex = 1;
+                }
+                pendampingSel.dispatchEvent(new Event('change', { bubbles: true }));
+                if (window.jQuery) window.jQuery(pendampingSel).change().selectpicker('refresh');
+            } else {
+                const labels = Array.from(document.querySelectorAll('label, div, span'));
+                const pLabel = labels.find(l => l.innerText && l.innerText.toLowerCase().includes('pendamping'));
+                if (pLabel) {
+                    const parent = pLabel.closest('.form-group, .mb-3, .col-md-6, .col-12') || pLabel.parentElement;
+                    if (parent) {
+                        const sel = parent.querySelector('select');
+                        if (sel) {
+                            const tanpaIdx = Array.from(sel.options).findIndex(o => o.text && o.text.toLowerCase().includes('tanpa'));
+                            if (tanpaIdx !== -1) sel.selectedIndex = tanpaIdx;
+                            else if (sel.options.length > 1) sel.selectedIndex = 1;
+                            sel.dispatchEvent(new Event('change', { bubbles: true }));
+                        }
+                    }
+                }
+            }
+
+            // 3. Tanggal Berangkat & Tanggal Pulang
+            if (rawDate) {
+                const d = new Date(rawDate);
+                if (!isNaN(d.getTime())) {
+                    const y = d.getFullYear();
+                    const m = String(d.getMonth() + 1).padStart(2, '0');
+                    const day = String(d.getDate()).padStart(2, '0');
+                    const dYYYYMMDD = `${y}-${m}-${day}`;
+                    const dDDMMYYYY = `${day}-${m}-${y}`;
+
+                    const rObj = new Date(d);
+                    rObj.setDate(rObj.getDate() + 1);
+                    const ry = rObj.getFullYear();
+                    const rm = String(rObj.getMonth() + 1).padStart(2, '0');
+                    const rday = String(rObj.getDate()).padStart(2, '0');
+                    const rYYYYMMDD = `${ry}-${rm}-${rday}`;
+                    const rDDMMYYYY = `${rday}-${rm}-${ry}`;
+
+                    const setDateInput = (selectors, val1, val2) => {
+                        for (const s of selectors) {
+                            const el = document.querySelector(s);
+                            if (el) {
+                                el.value = val1;
+                                el.dispatchEvent(new Event('input', { bubbles: true }));
+                                el.dispatchEvent(new Event('change', { bubbles: true }));
+                                if (el.value !== val1 && val2) {
+                                    el.value = val2;
+                                    el.dispatchEvent(new Event('input', { bubbles: true }));
+                                    el.dispatchEvent(new Event('change', { bubbles: true }));
+                                }
+                                break;
+                            }
+                        }
+                    };
+
+                    setDateInput(['input[name="date_depart"]', 'input[name="tanggal_berangkat"]', 'input[name="tgl_berangkat"]'], dDDMMYYYY, dYYYYMMDD);
+                    setDateInput(['input[name="date_return"]', 'input[name="tanggal_pulang"]', 'input[name="tgl_pulang"]'], rDDMMYYYY, rYYYYMMDD);
+                }
+            }
+        }, rawTargetDate, ketuaData.hp);
 
         await new Promise(r => setTimeout(r, 1000));
 
@@ -560,52 +644,73 @@ async function runAutoBookingFlow() {
 
                 await new Promise(r => setTimeout(r, 1200));
 
-                await page.evaluate((m) => {
+                await page.evaluate((m, ketuaHp) => {
                     const modal = document.querySelector('#modal_anggota') || document.querySelector('.modal.show') || document.querySelector('.modal');
                     if (!modal) return;
 
                     const fillInput = (selectors, val) => {
-                        if (!val) return;
+                        if (!val) return false;
                         for (const s of selectors) {
                             const el = modal.querySelector(s);
                             if (el) {
                                 el.value = val;
                                 el.dispatchEvent(new Event('input', { bubbles: true }));
                                 el.dispatchEvent(new Event('change', { bubbles: true }));
-                                break;
+                                return true;
                             }
                         }
+                        return false;
                     };
 
                     const selectOpt = (selectors, val) => {
-                        if (!val) return;
+                        if (!val) return false;
                         for (const s of selectors) {
                             const el = modal.querySelector(s);
                             if (el) {
                                 el.value = val;
                                 el.dispatchEvent(new Event('change', { bubbles: true }));
-                                break;
+                                return true;
                             }
                         }
+                        return false;
                     };
 
-                    fillInput(['input[name="nama"]', 'input[name="name"]', 'input[name="nama_anggota"]'], m.nama);
+                    fillInput(['input[name="nama"]', 'input[name="name"]', 'input[name="nama_anggota"]', 'input[name="nama_pengikut"]'], m.nama);
                     fillInput(['input[name="birthdate"]', 'input[name="tgl_lahir"]', 'input[name="tanggal_lahir"]', 'input[name="b_d"]'], m.birthdate);
                     selectOpt(['select[name="id_identity"]', 'select[name="jenis_identitas"]', 'select[name="identity_type"]'], m.identityType);
-                    fillInput(['input[name="identity_no"]', 'input[name="no_identitas"]', 'input[name="nik"]'], m.identityNo);
+                    fillInput(['input[name="identity_no"]', 'input[name="no_identitas"]', 'input[name="nik"]', 'input[name="no_kartu_identitas"]'], m.identityNo);
                     selectOpt(['select[name="id_gender"]', 'select[name="jenis_kelamin"]', 'select[name="gender"]'], m.gender);
-                    fillInput(['input[name="hp"]', 'input[name="no_hp"]', 'input[name="phone"]'], m.hp);
                     fillInput(['input[name="address"]', 'input[name="alamat"]'], m.address);
                     selectOpt(['select[name="id_job"]', 'select[name="job_id"]', 'select[name="pekerjaan"]'], m.jobId);
                     fillInput(['input[name="family_hp"]', 'input[name="hp_keluarga"]', 'input[name="no_hp_keluarga"]'], m.familyHp);
                     selectOpt(['select[name="id_country"]', 'select[name="negara"]', 'select[name="country"]'], m.countryId || '99');
+
+                    // ⚠️ KHUSUS NO HP ANGGOTA: Coba berbagai nama selector & Label "No HP Anggota"
+                    const memberHpVal = m.hp || m.familyHp || ketuaHp || '081234567890';
+                    let hpFilled = fillInput(['input[name="phone"]', 'input[name="no_hp_anggota"]', 'input[name="hp_anggota"]', 'input[name="phone_number"]', 'input[name="no_hp"]', 'input[name="hp"]', 'input[type="tel"]'], memberHpVal);
+                    
+                    if (!hpFilled) {
+                        const labels = Array.from(modal.querySelectorAll('label, div, span'));
+                        const hpLabel = labels.find(l => l.innerText && (l.innerText.toLowerCase().includes('no hp anggota') || l.innerText.toLowerCase().includes('no hp')));
+                        if (hpLabel) {
+                            const parent = hpLabel.closest('.form-group, .mb-3, .col-md-6, .col-12, div') || hpLabel.parentElement;
+                            if (parent) {
+                                const inp = parent.querySelector('input');
+                                if (inp) {
+                                    inp.value = memberHpVal;
+                                    inp.dispatchEvent(new Event('input', { bubbles: true }));
+                                    inp.dispatchEvent(new Event('change', { bubbles: true }));
+                                }
+                            }
+                        }
+                    }
 
                     const submitBtn = modal.querySelector('button[type="submit"]') || 
                                       Array.from(modal.querySelectorAll('button')).find(b => b.innerText && (b.innerText.includes('Simpan') || b.innerText.includes('Tambah') || b.innerText.includes('Submit')));
                     if (submitBtn) {
                         submitBtn.click();
                     }
-                }, member);
+                }, member, ketuaData.hp);
 
                 await new Promise(r => setTimeout(r, 1500));
             }
