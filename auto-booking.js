@@ -251,42 +251,9 @@ async function runAutoBookingFlow() {
         // Step 1: Navigasi ke Website Utama (Kilat tanpa gambar/media)
         console.log(`📍 Step 1: Membuka website target (Speed-Optimized Mode): ${targetUrl}`);
         await page.goto(targetUrl, { waitUntil: 'domcontentloaded', timeout: 30000 }).catch(() => {});
-        await new Promise(r => setTimeout(r, 1000));
+        await new Promise(r => setTimeout(r, 500));
 
-        // Step 2: Cek Status Login Akun Google / TNBTS
-        console.log(`🔒 Step 2: Memeriksa Status Login Akun Google / TNBTS...`);
-        const accountStatus = await page.evaluate(() => {
-            const bodyTxt = (document.body && document.body.innerText) ? document.body.innerText : '';
-            const isLoggedIn = bodyTxt.includes('Sign out') || bodyTxt.includes('Booking Saya');
-            
-            let name = 'Guest';
-            document.querySelectorAll('a, span, div').forEach(el => {
-                const txt = (el && el.textContent) ? el.textContent.trim() : '';
-                if (txt.includes('Sign out') || txt.includes('Booking Saya')) {
-                    name = txt.replace('Sign out', '').trim() || 'Logged In User';
-                }
-            });
-
-            return { isLoggedIn, name };
-        });
-
-        if (!accountStatus.isLoggedIn) {
-            console.log(`\n==================================================`);
-            console.log(`❌ BELUM LOGIN AKUN GOOGLE / TNBTS!`);
-            console.log(`💡 Untuk booking tiket, akun harus ter-login terlebih dahulu.`);
-            console.log(`👉 Silakan jalankan perintah: npm run login`);
-            console.log(`   (Lalu login sekali dengan akun Google Anda).`);
-            console.log(`==================================================\n`);
-            
-            if (currentBookingId) {
-                await updateBookingStatus(currentBookingId, 'pending');
-            }
-            return;
-        }
-
-        console.log(`✅ Status Akun: LOGGED IN (${accountStatus.name || 'Terhubung'})`);
-
-        // Step 3: Pindah ke Tab Destinasi (Semeru / Ranu Regulo)
+        // Step 2: Berpindah ke Tab Destinasi (Semeru / Ranu Regulo)
         await switchToDestinationTab(page, destination);
 
         // Step 4 & 5: INFINITE RETRY LOOP HIT KUOTA SAMPAI TERSEDIA ATAU USER CANCEL (Ctrl+C)
