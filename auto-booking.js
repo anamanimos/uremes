@@ -207,11 +207,23 @@ async function runAutoBookingFlow() {
             return `${day}-${m}-${y}`;
         };
 
+        const cleanPhone = (hpStr) => {
+            if (!hpStr) return '081234567890';
+            let cleaned = String(hpStr).replace(/[^0-9]/g, '');
+            if (cleaned.startsWith('62')) {
+                cleaned = '0' + cleaned.slice(2);
+            }
+            if (!cleaned.startsWith('0')) {
+                cleaned = '0' + cleaned;
+            }
+            return cleaned;
+        };
+
         if (dbBooking.ketua) {
             ketuaData = {
                 nama: dbBooking.ketua.nama || ketuaData.nama,
                 nik: dbBooking.ketua.identity_no || ketuaData.nik,
-                hp: dbBooking.ketua.hp || ketuaData.hp,
+                hp: cleanPhone(dbBooking.ketua.hp || ketuaData.hp),
                 address: dbBooking.ketua.address || ketuaData.address,
                 gender: String(dbBooking.ketua.gender_id || 1),
                 identityType: String(dbBooking.ketua.identity_type_id || 1),
@@ -228,10 +240,10 @@ async function runAutoBookingFlow() {
                 identityType: String(m.identity_type_id || 1),
                 identityNo: m.identity_no || `350712345678900${i + 2}`,
                 birthdate: formatDateToDDMMYYYY(m.birthdate),
-                hp: m.hp || m.family_hp || dbBooking.ketua?.hp || ('08123456789' + (i + 1)),
+                hp: cleanPhone(m.hp || m.family_hp || dbBooking.ketua?.hp || ('08123456789' + (i + 1))),
                 address: m.address || 'Jl. Raya No. ' + (i + 1),
                 jobId: String(m.job_id || 2),
-                familyHp: m.family_hp || m.hp || dbBooking.ketua?.hp || '081299887766',
+                familyHp: cleanPhone(m.family_hp || m.hp || dbBooking.ketua?.hp || '081299887766'),
                 countryId: String(m.country_id || 99)
             }));
         }
@@ -606,6 +618,17 @@ async function runAutoBookingFlow() {
                     setDateInput(['input[name="date_return"]', 'input[name="tanggal_pulang"]', 'input[name="tgl_pulang"]'], rDDMMYYYY, rYYYYMMDD);
                 }
             }
+
+            // 4. Nama Organisasi (input[name="organisasi"])
+            const orgInp = document.querySelector('input[name="organisasi"], input[name="nama_organisasi"]');
+            if (orgInp) {
+                const orgVal = 'Pecinta Alam Semeru';
+                orgInp.value = orgVal;
+                orgInp.dispatchEvent(new Event('input', { bubbles: true }));
+                orgInp.dispatchEvent(new Event('change', { bubbles: true }));
+                orgInp.dispatchEvent(new Event('blur', { bubbles: true }));
+                if (window.jQuery) window.jQuery(orgInp).trigger('input').trigger('change').trigger('blur');
+            }
         }, rawTargetDate, ketuaData.hp);
 
         await new Promise(r => setTimeout(r, 1000));
@@ -811,8 +834,16 @@ async function runAutoBookingFlow() {
                     const idNoInp = modal.querySelector('input[name="identity_no"], input[name="no_identitas"], input[name="nik"], input[name="no_kartu_identitas"]');
                     setInputValue(idNoInp, m.identityNo);
 
+                    const cleanPhone = (hpStr) => {
+                        if (!hpStr) return '081234567890';
+                        let cleaned = String(hpStr).replace(/[^0-9]/g, '');
+                        if (cleaned.startsWith('62')) cleaned = '0' + cleaned.slice(2);
+                        if (!cleaned.startsWith('0')) cleaned = '0' + cleaned;
+                        return cleaned;
+                    };
+
                     // 7. No HP Anggota (Atribut Presisi: name="hp_member")
-                    const hpVal = m.hp || m.familyHp || ketuaHp || '081234567890';
+                    const hpVal = cleanPhone(m.hp || m.familyHp || ketuaHp || '081234567890');
                     const hpInp = modal.querySelector('input[name="hp_member"], input[name="hp"], input[name="no_hp_anggota"], input[name="hp_anggota"], input[name="phone_number"], input[name="no_hp"], input[name="phone"]');
                     if (hpInp) {
                         hpInp.removeAttribute('disabled');
@@ -828,7 +859,7 @@ async function runAutoBookingFlow() {
                     }
 
                     // 8. No HP Keluarga (input[name="family_hp"])
-                    const famHpVal = m.familyHp || m.hp || ketuaHp || '081299887766';
+                    const famHpVal = cleanPhone(m.familyHp || m.hp || ketuaHp || '081299887766');
                     const famHpInp = modal.querySelector('input[name="family_hp"], input[name="hp_keluarga"], input[name="no_hp_keluarga"]');
                     setInputValue(famHpInp, famHpVal);
 
@@ -859,7 +890,18 @@ async function runAutoBookingFlow() {
                     return style.display === 'none' || !modal.classList.contains('show');
                 }, { timeout: 4000 }).catch(() => {});
 
-                console.log(`   ✅ [ANGGOTA ${memberNum}/${memberList.length}] SUKSES TERINPUT: ${member.nama}`);
+                // Verifikasi Jumlah Baris di Tabel TNBTS
+                const newTableRowCount = await page.evaluate(() => {
+                    const rows = Array.from(document.querySelectorAll('table tbody tr'));
+                    return rows.filter(tr => tr.innerText.trim() && !tr.innerText.includes('No data available') && tr.querySelectorAll('td').length >= 3).length;
+                });
+
+                if (newTableRowCount > existingMembers + i) {
+                    console.log(`   ✅ [ANGGOTA ${memberNum}/${memberList.length}] SUKSES TERINPUT & MUNCUL DI TABEL! (Total di Tabel: ${newTableRowCount} Anggota)`);
+                } else {
+                    console.log(`   ⚠️ [ANGGOTA ${memberNum}/${memberList.length}] GAGAL TERSIMPAN DI TABEL. Memeriksa validasi form...`);
+                }
+
                 await new Promise(r => setTimeout(r, 1000));
             }
             console.log(`\n==================================================`);
