@@ -2,12 +2,14 @@ const mysql = require('mysql2/promise');
 
 /**
  * Konfigurasi Database MySQL Laragon ('auto')
+ * dateStrings: true memastikan kolom DATE/DATETIME dikembalikan sebagai string murni YYYY-MM-DD tanpa geseran zona waktu
  */
 const dbConfig = {
     host: 'localhost',
     user: 'root',
     password: '',
-    database: 'auto'
+    database: 'auto',
+    dateStrings: true
 };
 
 async function getConnection() {
