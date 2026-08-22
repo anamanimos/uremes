@@ -182,19 +182,26 @@ async function runAutoBookingFlow() {
             }
         }
 
-        const formatDateToYYYYMMDD = (dateVal) => {
-            if (!dateVal) return '1995-05-20';
+        const formatDateToDDMMYYYY = (dateVal) => {
+            if (!dateVal) return '20-05-1995';
             const strVal = String(dateVal).trim();
-            if (/^\d{4}-\d{2}-\d{2}$/.test(strVal)) return strVal;
+            if (/^\d{2}-\d{2}-\d{4}$/.test(strVal)) return strVal;
+            if (/^\d{4}-\d{2}-\d{2}$/.test(strVal)) {
+                const p = strVal.split('-');
+                return `${p[2]}-${p[1]}-${p[0]}`;
+            }
             const d = new Date(dateVal);
             if (isNaN(d.getTime())) {
-                if (strVal.includes('T')) return strVal.split('T')[0];
-                return '1995-05-20';
+                if (strVal.includes('T')) {
+                    const p = strVal.split('T')[0].split('-');
+                    if (p.length === 3) return `${p[2]}-${p[1]}-${p[0]}`;
+                }
+                return '20-05-1995';
             }
             const y = d.getFullYear();
             const m = String(d.getMonth() + 1).padStart(2, '0');
             const day = String(d.getDate()).padStart(2, '0');
-            return `${y}-${m}-${day}`;
+            return `${day}-${m}-${y}`;
         };
 
         if (dbBooking.ketua) {
@@ -205,7 +212,7 @@ async function runAutoBookingFlow() {
                 address: dbBooking.ketua.address || ketuaData.address,
                 gender: String(dbBooking.ketua.gender_id || 1),
                 identityType: String(dbBooking.ketua.identity_type_id || 1),
-                birthdate: formatDateToYYYYMMDD(dbBooking.ketua.birthdate || '1990-01-01')
+                birthdate: formatDateToDDMMYYYY(dbBooking.ketua.birthdate || '1990-01-01')
             };
         }
 
@@ -215,7 +222,7 @@ async function runAutoBookingFlow() {
                 gender: String(m.gender_id || 1),
                 identityType: String(m.identity_type_id || 1),
                 identityNo: m.identity_no || `350712345678900${i + 2}`,
-                birthdate: formatDateToYYYYMMDD(m.birthdate),
+                birthdate: formatDateToDDMMYYYY(m.birthdate),
                 hp: m.hp || m.family_hp || dbBooking.ketua?.hp || ('08123456789' + (i + 1)),
                 address: m.address || 'Jl. Raya No. ' + (i + 1),
                 jobId: String(m.job_id || 2),
@@ -629,15 +636,21 @@ async function runAutoBookingFlow() {
             // Tanggal Lahir Ketua (Dukungan Flatpickr Datepicker & Remove Readonly)
             const kBdInp = document.querySelector('input[name="birthdate"], input[name="tgl_lahir"], input[name="tanggal_lahir"]');
             if (kBdInp) {
-                const bDateVal = k.birthdate || '1990-01-01';
+                const bDateVal = k.birthdate || '01-01-1990';
                 if (kBdInp._flatpickr) {
-                    kBdInp._flatpickr.setDate(bDateVal, true);
-                } else {
-                    kBdInp.removeAttribute('readonly');
-                    fillVal('input[name="birthdate"]', bDateVal);
-                    if (window.jQuery && window.jQuery(kBdInp).data && window.jQuery(kBdInp).data('flatpickr')) {
-                        window.jQuery(kBdInp).data('flatpickr').setDate(bDateVal, true);
+                    try { kBdInp._flatpickr.setDate(bDateVal, true, "d-m-Y"); } catch(e) {
+                        kBdInp._flatpickr.setDate(bDateVal, true);
                     }
+                }
+                kBdInp.removeAttribute('readonly');
+                kBdInp.removeAttribute('disabled');
+                fillVal('input[name="birthdate"]', bDateVal);
+                if (kBdInp.nextElementSibling && kBdInp.nextElementSibling.classList.contains('flatpickr-input')) {
+                    kBdInp.nextElementSibling.removeAttribute('readonly');
+                    kBdInp.nextElementSibling.value = bDateVal;
+                }
+                if (window.jQuery && window.jQuery(kBdInp).data && window.jQuery(kBdInp).data('flatpickr')) {
+                    try { window.jQuery(kBdInp).data('flatpickr').setDate(bDateVal, true, "d-m-Y"); } catch(e2) {}
                 }
             }
         }, ketuaData);
@@ -704,18 +717,24 @@ async function runAutoBookingFlow() {
                     const nameInp = modal.querySelector('input[name="name"], input[name="nama"], input[name="nama_anggota"], input[name="nama_pengikut"]');
                     setInputValue(nameInp, m.nama);
 
-                    // 2. Tanggal Lahir (Dukungan Flatpickr Datepicker & Remove Readonly)
+                    // 2. Tanggal Lahir (Dukungan Flatpickr Datepicker DD-MM-YYYY)
                     const bdInp = modal.querySelector('input[name="birthdate"], input[name="tgl_lahir"], input[name="tanggal_lahir"]');
                     if (bdInp) {
-                        const bDateVal = m.birthdate;
+                        const bDateVal = m.birthdate || '20-05-1995';
                         if (bdInp._flatpickr) {
-                            bdInp._flatpickr.setDate(bDateVal, true);
-                        } else {
-                            bdInp.removeAttribute('readonly');
-                            setInputValue(bdInp, bDateVal);
-                            if (window.jQuery && window.jQuery(bdInp).data && window.jQuery(bdInp).data('flatpickr')) {
-                                window.jQuery(bdInp).data('flatpickr').setDate(bDateVal, true);
+                            try { bdInp._flatpickr.setDate(bDateVal, true, "d-m-Y"); } catch(e) {
+                                bdInp._flatpickr.setDate(bDateVal, true);
                             }
+                        }
+                        bdInp.removeAttribute('readonly');
+                        bdInp.removeAttribute('disabled');
+                        setInputValue(bdInp, bDateVal);
+                        if (bdInp.nextElementSibling && bdInp.nextElementSibling.classList.contains('flatpickr-input')) {
+                            bdInp.nextElementSibling.removeAttribute('readonly');
+                            bdInp.nextElementSibling.value = bDateVal;
+                        }
+                        if (window.jQuery && window.jQuery(bdInp).data && window.jQuery(bdInp).data('flatpickr')) {
+                            try { window.jQuery(bdInp).data('flatpickr').setDate(bDateVal, true, "d-m-Y"); } catch(e2) {}
                         }
                     }
 
