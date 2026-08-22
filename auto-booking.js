@@ -758,30 +758,45 @@ async function runAutoBookingFlow() {
 
         await new Promise(r => setTimeout(r, 200));
 
-        // 7c. Cek Jumlah Anggota yang Sudah Ada di Tabel
-        const existingMembers = await page.evaluate(() => {
-            const rows = Array.from(document.querySelectorAll('table tbody tr'));
-            const validRows = rows.filter(tr => {
-                const txt = tr.innerText.trim();
-                return txt && !txt.includes('No data available') && tr.querySelectorAll('td').length >= 2;
+        // 7c. Cek Anggota yang Sudah Ada di Tabel TNBTS secara Presisi Nama/NIK
+        const getExistingMembersOnPage = async () => {
+            return await page.evaluate(() => {
+                const rows = Array.from(document.querySelectorAll('table tbody tr'));
+                return rows.map(tr => tr.innerText.trim()).filter(txt => txt && !txt.includes('No data available'));
             });
-            return validRows.length;
-        });
+        };
 
+        let existingRows = await getExistingMembersOnPage();
         console.log(`\n==================================================`);
-        console.log(`👥 PROSES INPUT ANGGOTA [${destTitle}]: Target ${memberList.length} Anggota (Sudah tersimpan: ${existingMembers})`);
+        console.log(`👥 PROSES INPUT ANGGOTA [${destTitle}]: Target ${memberList.length} Anggota (Sudah tersimpan di tabel: ${existingRows.length})`);
         console.log(`==================================================\n`);
 
-        const membersToAdd = memberList.slice(existingMembers);
+        if (memberList.length > 0) {
+            console.log(`➕ Memulai Pengisian & Deduplikasi ${memberList.length} Anggota:`);
 
-        if (membersToAdd.length > 0) {
-            console.log(`➕ Memulai Pengisian ${membersToAdd.length} Anggota (Detail per Anggota):`);
+            for (let i = 0; i < memberList.length; i++) {
+                const member = memberList[i];
+                const memberNum = i + 1;
 
-            for (let i = 0; i < membersToAdd.length; i++) {
-                const member = membersToAdd[i];
-                const memberNum = existingMembers + i + 1;
                 console.log(`\n--------------------------------------------------`);
-                console.log(`👤 [ANGGOTA ${memberNum}/${memberList.length}] Processing: ${member.nama}...`);
+                console.log(`👤 [ANGGOTA ${memberNum}/${memberList.length}] Checking: ${member.nama}...`);
+
+                // 🛡️ DEDUPLIKASI LAYER 1: Cek apakah Nama / NIK anggota sudah ada di tabel TNBTS
+                const isAlreadySaved = await page.evaluate((targetName, targetNik) => {
+                    const rows = Array.from(document.querySelectorAll('table tbody tr'));
+                    return rows.some(tr => {
+                        const txt = tr.innerText.toLowerCase();
+                        if (targetName && txt.includes(targetName.toLowerCase())) return true;
+                        if (targetNik && targetNik.length >= 8 && txt.includes(targetNik.toLowerCase())) return true;
+                        return false;
+                    });
+                }, member.nama, member.identityNo);
+
+                if (isAlreadySaved) {
+                    console.log(`   ⏭️ [SKIPPED - DEDUPLIKASI] ${member.nama} SUDAH MUNCUL DI TABEL TNBTS. Melewati pengisian ulang.`);
+                    continue;
+                }
+
                 console.log(`   📂 NIK: ${member.identityNo} | Tgl Lahir: ${member.birthdate} | HP: ${member.hp}`);
 
                 let isMemberSaved = false;
@@ -791,6 +806,30 @@ async function runAutoBookingFlow() {
                     if (Date.now() - last429Time < 3000) {
                         console.log(`   ⏳ [RATE LIMIT 429 RECOVERY] Jeda 2.5 detik untuk melewati limitasi server Cloudflare...`);
                         await new Promise(r => setTimeout(r, 2500));
+                    }
+
+                    // 🛡️ DEDUPLIKASI LAYER 2 (Sebelum Retry Submit): Cek apakah AJAX sebelumnya terlambat namun sukses
+                    const checkExistsInRetry = await page.evaluate((targetName, targetNik) => {
+                        const rows = Array.from(document.querySelectorAll('table tbody tr'));
+                        return rows.some(tr => {
+                            const txt = tr.innerText.toLowerCase();
+                            if (targetName && txt.includes(targetName.toLowerCase())) return true;
+                            if (targetNik && targetNik.length >= 8 && txt.includes(targetNik.toLowerCase())) return true;
+                            return false;
+                        });
+                    }, member.nama, member.identityNo);
+
+                    if (checkExistsInRetry) {
+                        console.log(`   ✅ [DEDUPLIKASI TERDETEKSI] ${member.nama} SUDAH MASUK KE TABEL TNBTS! Batal submit ulang.`);
+                        await page.evaluate(() => {
+                            const openModal = document.querySelector('#modal_anggota.show, #modal_pengikut.show, .modal.show');
+                            if (openModal) {
+                                const closeBtn = openModal.querySelector('.close, [data-dismiss="modal"], button.btn-secondary');
+                                if (closeBtn) closeBtn.click();
+                            }
+                        });
+                        isMemberSaved = true;
+                        break;
                     }
 
                     if (retry > 1) {
@@ -949,14 +988,19 @@ async function runAutoBookingFlow() {
                         return style.display === 'none' || !modal.classList.contains('show');
                     }, { timeout: 3000 }).catch(() => {});
 
-                    // Verifikasi Jumlah Baris di Tabel TNBTS & Auto Recovery
-                    const newTableRowCount = await page.evaluate(() => {
+                    // Verifikasi Nama/NIK di Tabel TNBTS
+                    const verifyInTable = await page.evaluate((targetName, targetNik) => {
                         const rows = Array.from(document.querySelectorAll('table tbody tr'));
-                        return rows.filter(tr => tr.innerText.trim() && !tr.innerText.includes('No data available') && tr.querySelectorAll('td').length >= 2).length;
-                    });
+                        return rows.some(tr => {
+                            const txt = tr.innerText.toLowerCase();
+                            if (targetName && txt.includes(targetName.toLowerCase())) return true;
+                            if (targetNik && targetNik.length >= 8 && txt.includes(targetNik.toLowerCase())) return true;
+                            return false;
+                        });
+                    }, member.nama, member.identityNo);
 
-                    if (newTableRowCount > existingMembers + i) {
-                        console.log(`   ✅ [ANGGOTA ${memberNum}/${memberList.length}] SUKSES TERINPUT & MUNCUL DI TABEL! (Total di Tabel: ${newTableRowCount} Anggota)`);
+                    if (verifyInTable) {
+                        console.log(`   ✅ [ANGGOTA ${memberNum}/${memberList.length}] SUKSES TERINPUT & MUNCUL DI TABEL! (${member.nama})`);
                         isMemberSaved = true;
                         break;
                     } else {
@@ -971,13 +1015,13 @@ async function runAutoBookingFlow() {
                 }
 
                 if (!isMemberSaved) {
-                    console.log(`❌ [ANGGOTA ${memberNum}/${memberList.length}] GAGAL TERSIMPAN setelah 4 kali percobaan karena limitasi server.`);
+                    console.log(`❌ [ANGGOTA ${memberNum}/${memberList.length}] GAGAL TERSIMPAN setelah 4 kali percobaan.`);
                 }
 
                 await new Promise(r => setTimeout(r, 600));
             }
             console.log(`\n==================================================`);
-            console.log(`✅ Seluruh ${memberList.length} anggota pendaftaran berhasil diinputkan!`);
+            console.log(`✅ Seluruh ${memberList.length} anggota pendaftaran berhasil diproses!`);
             console.log(`==================================================`);
         } else {
             console.log('✅ Anggota sudah lengkap tersimpan di tabel TNBTS!');
