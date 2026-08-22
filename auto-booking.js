@@ -273,6 +273,27 @@ async function runAutoBookingFlow() {
             console.log(`🔄 HIT KE-${hitCount} [${new Date().toLocaleTimeString('id-ID')}] - Cek Kuota Tanggal ${targetDateString || rawTargetDate}...`);
             console.log(`==================================================`);
 
+            // 🛡️ CEK JIKA SERVER TNBTS DOWN / CLOUDFLARE 504 GATEWAY TIMEOUT
+            const isServerError = await page.evaluate(() => {
+                const txt = (document.body && document.body.innerText) ? document.body.innerText.toLowerCase() : '';
+                return txt.includes('gateway time-out') || 
+                       txt.includes('504 gateway') || 
+                       txt.includes('502 bad gateway') || 
+                       txt.includes('service unavailable') || 
+                       txt.includes('500 internal server error') ||
+                       document.title.includes('504') ||
+                       document.title.includes('502');
+            });
+
+            if (isServerError) {
+                console.log(`⚠️ Server TNBTS sedang Down / Gateway Timeout (Cloudflare 504). Re-navigasi ke target dalam 5 detik...`);
+                await new Promise(r => setTimeout(r, 5000));
+                await page.goto(targetUrl, { waitUntil: 'domcontentloaded', timeout: 30000 }).catch(() => {});
+                await page.waitForSelector('#pills-two-example2-tab, #pills-three-example2-tab, form', { timeout: 15000 }).catch(() => {});
+                await switchToDestinationTab(page, destination);
+                continue;
+            }
+
             // Pastikan Tab Target Tetap Aktif
             await page.evaluate((dest) => {
                 let paneSel = dest === 'ranu-regulo' ? '#pills-three-example2' : '#pills-two-example2';
