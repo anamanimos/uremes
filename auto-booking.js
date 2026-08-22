@@ -662,63 +662,76 @@ async function runAutoBookingFlow() {
                     const modal = document.querySelector('#modal_anggota') || document.querySelector('.modal.show') || document.querySelector('.modal');
                     if (!modal) return;
 
-                    const fillInput = (selectors, val) => {
-                        if (!val) return false;
-                        for (const s of selectors) {
-                            const el = modal.querySelector(s);
-                            if (el) {
-                                el.value = val;
-                                el.dispatchEvent(new Event('input', { bubbles: true }));
-                                el.dispatchEvent(new Event('change', { bubbles: true }));
-                                return true;
-                            }
+                    const setInputValue = (el, val) => {
+                        if (!el || !val) return;
+                        el.value = String(val);
+                        el.dispatchEvent(new Event('input', { bubbles: true }));
+                        el.dispatchEvent(new Event('change', { bubbles: true }));
+                        el.dispatchEvent(new Event('blur', { bubbles: true }));
+                        if (window.jQuery) {
+                            window.jQuery(el).trigger('input').trigger('change').trigger('blur');
                         }
-                        return false;
                     };
 
-                    const selectOpt = (selectors, val) => {
-                        if (!val) return false;
-                        for (const s of selectors) {
-                            const el = modal.querySelector(s);
-                            if (el) {
-                                el.value = val;
-                                el.dispatchEvent(new Event('change', { bubbles: true }));
-                                return true;
-                            }
+                    const setSelectValue = (el, val) => {
+                        if (!el || !val) return;
+                        el.value = String(val);
+                        el.dispatchEvent(new Event('change', { bubbles: true }));
+                        if (window.jQuery) {
+                            window.jQuery(el).trigger('change');
+                            if (window.jQuery(el).selectpicker) window.jQuery(el).selectpicker('refresh');
                         }
-                        return false;
                     };
 
-                    fillInput(['input[name="nama"]', 'input[name="name"]', 'input[name="nama_anggota"]', 'input[name="nama_pengikut"]'], m.nama);
-                    fillInput(['input[name="birthdate"]', 'input[name="tgl_lahir"]', 'input[name="tanggal_lahir"]', 'input[name="b_d"]'], m.birthdate);
-                    selectOpt(['select[name="id_identity"]', 'select[name="jenis_identitas"]', 'select[name="identity_type"]'], m.identityType);
-                    fillInput(['input[name="identity_no"]', 'input[name="no_identitas"]', 'input[name="nik"]', 'input[name="no_kartu_identitas"]'], m.identityNo);
-                    selectOpt(['select[name="id_gender"]', 'select[name="jenis_kelamin"]', 'select[name="gender"]'], m.gender);
-                    fillInput(['input[name="address"]', 'input[name="alamat"]'], m.address);
-                    selectOpt(['select[name="id_job"]', 'select[name="job_id"]', 'select[name="pekerjaan"]'], m.jobId);
-                    fillInput(['input[name="family_hp"]', 'input[name="hp_keluarga"]', 'input[name="no_hp_keluarga"]'], m.familyHp);
-                    selectOpt(['select[name="id_country"]', 'select[name="negara"]', 'select[name="country"]'], m.countryId || '99');
+                    // 1. Nama Pengikut
+                    const nameInp = modal.querySelector('input[name="name"], input[name="nama"], input[name="nama_anggota"], input[name="nama_pengikut"]');
+                    setInputValue(nameInp, m.nama);
 
-                    // ⚠️ KHUSUS NO HP ANGGOTA: Coba berbagai nama selector & Label "No HP Anggota"
-                    const memberHpVal = m.hp || m.familyHp || ketuaHp || '081234567890';
-                    let hpFilled = fillInput(['input[name="phone"]', 'input[name="no_hp_anggota"]', 'input[name="hp_anggota"]', 'input[name="phone_number"]', 'input[name="no_hp"]', 'input[name="hp"]', 'input[type="tel"]'], memberHpVal);
-                    
-                    if (!hpFilled) {
-                        const labels = Array.from(modal.querySelectorAll('label, div, span'));
-                        const hpLabel = labels.find(l => l.innerText && (l.innerText.toLowerCase().includes('no hp anggota') || l.innerText.toLowerCase().includes('no hp')));
-                        if (hpLabel) {
-                            const parent = hpLabel.closest('.form-group, .mb-3, .col-md-6, .col-12, div') || hpLabel.parentElement;
-                            if (parent) {
-                                const inp = parent.querySelector('input');
-                                if (inp) {
-                                    inp.value = memberHpVal;
-                                    inp.dispatchEvent(new Event('input', { bubbles: true }));
-                                    inp.dispatchEvent(new Event('change', { bubbles: true }));
-                                }
-                            }
-                        }
+                    // 2. Tanggal Lahir
+                    const bdInp = modal.querySelector('input[name="birthdate"], input[name="tgl_lahir"], input[name="tanggal_lahir"]');
+                    setInputValue(bdInp, m.birthdate);
+
+                    // 3. Jenis Kelamin
+                    const genderSel = modal.querySelector('select[name="id_gender"], select[name="gender"], select[name="jenis_kelamin"]');
+                    setSelectValue(genderSel, m.gender);
+
+                    // 4. Alamat
+                    const addrInp = modal.querySelector('input[name="address"], input[name="alamat"]');
+                    setInputValue(addrInp, m.address);
+
+                    // 5. Jenis Identitas
+                    const idTypeSel = modal.querySelector('select[name="id_identity"], select[name="jenis_identitas"], select[name="identity_type"]');
+                    setSelectValue(idTypeSel, m.identityType);
+
+                    // 6. NIK / No Identitas
+                    const idNoInp = modal.querySelector('input[name="identity_no"], input[name="no_identitas"], input[name="nik"], input[name="no_kartu_identitas"]');
+                    setInputValue(idNoInp, m.identityNo);
+
+                    // 7. No HP Anggota (input[name="hp"])
+                    const hpVal = m.hp || m.familyHp || ketuaHp || '081234567890';
+                    const hpInp = modal.querySelector('input[name="hp"], input[name="phone"], input[name="no_hp_anggota"], input[name="hp_anggota"], input[name="phone_number"], input[name="no_hp"]');
+                    if (hpInp) {
+                        setInputValue(hpInp, hpVal);
+                    } else {
+                        const inputs = Array.from(modal.querySelectorAll('input'));
+                        const targetInp = inputs.find(i => i.name && i.name !== 'family_hp' && (i.name.includes('hp') || i.name.includes('phone') || i.type === 'tel'));
+                        if (targetInp) setInputValue(targetInp, hpVal);
                     }
 
+                    // 8. No HP Keluarga (input[name="family_hp"])
+                    const famHpVal = m.familyHp || m.hp || ketuaHp || '081299887766';
+                    const famHpInp = modal.querySelector('input[name="family_hp"], input[name="hp_keluarga"], input[name="no_hp_keluarga"]');
+                    setInputValue(famHpInp, famHpVal);
+
+                    // 9. Pekerjaan
+                    const jobSel = modal.querySelector('select[name="id_job"], select[name="job_id"], select[name="pekerjaan"]');
+                    setSelectValue(jobSel, m.jobId || 2);
+
+                    // 10. Negara
+                    const countrySel = modal.querySelector('select[name="id_country"], select[name="country"], select[name="negara"]');
+                    setSelectValue(countrySel, m.countryId || '99');
+
+                    // Klik Tombol Simpan
                     const submitBtn = modal.querySelector('button[type="submit"]') || 
                                       Array.from(modal.querySelectorAll('button')).find(b => b.innerText && (b.innerText.includes('Simpan') || b.innerText.includes('Tambah') || b.innerText.includes('Submit')));
                     if (submitBtn) {
@@ -726,7 +739,15 @@ async function runAutoBookingFlow() {
                     }
                 }, member, ketuaData.hp);
 
-                await new Promise(r => setTimeout(r, 1500));
+                // Menunggu modal tertutup secara alami sebelum menambah anggota berikutnya
+                await page.waitForFunction(() => {
+                    const modal = document.querySelector('#modal_anggota') || document.querySelector('.modal.show');
+                    if (!modal) return true;
+                    const style = window.getComputedStyle(modal);
+                    return style.display === 'none' || !modal.classList.contains('show');
+                }, { timeout: 5000 }).catch(() => {});
+
+                await new Promise(r => setTimeout(r, 1000));
             }
             console.log(`✅ Seluruh ${memberList.length} anggota pendaftaran berhasil diinputkan!`);
         } else {
