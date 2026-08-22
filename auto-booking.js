@@ -212,7 +212,9 @@ async function runAutoBookingFlow() {
                 address: dbBooking.ketua.address || ketuaData.address,
                 gender: String(dbBooking.ketua.gender_id || 1),
                 identityType: String(dbBooking.ketua.identity_type_id || 1),
-                birthdate: formatDateToDDMMYYYY(dbBooking.ketua.birthdate || '1990-01-01')
+                birthdate: formatDateToDDMMYYYY(dbBooking.ketua.birthdate || '1990-01-01'),
+                provinceId: dbBooking.ketua.province_id || '35',
+                districtId: dbBooking.ketua.district_id || '3573'
             };
         }
 
@@ -653,9 +655,46 @@ async function runAutoBookingFlow() {
                     try { window.jQuery(kBdInp).data('flatpickr').setDate(bDateVal, true, "d-m-Y"); } catch(e2) {}
                 }
             }
+
+            // Propinsi Ketua (select[name="id_province"])
+            const provSel = document.querySelector('select[name="id_province"], select[name="province_id"], select[name="provinsi"]');
+            if (provSel) {
+                const targetProv = k.provinceId || '35';
+                let idx = Array.from(provSel.options).findIndex(o => o.value === String(targetProv));
+                if (idx === -1) {
+                    idx = Array.from(provSel.options).findIndex(o => o.text && (o.text.toLowerCase().includes('jawa timur') || o.text.toLowerCase().includes('jatim')));
+                }
+                if (idx !== -1) {
+                    provSel.selectedIndex = idx;
+                    provSel.dispatchEvent(new Event('change', { bubbles: true }));
+                    if (window.jQuery) window.jQuery(provSel).change().trigger('change');
+                }
+            }
         }, ketuaData);
 
-        await new Promise(r => setTimeout(r, 1500));
+        await new Promise(r => setTimeout(r, 1200));
+
+        // Select Kota/Kabupaten (districts loaded via AJAX)
+        await page.evaluate((k) => {
+            const distSel = document.querySelector('select[name="id_district"], select[name="id_regency"], select[name="id_city"], select[name="kota"], select[name="district_id"]');
+            if (distSel && distSel.options.length > 1) {
+                const targetDist = k.districtId || '3573';
+                let idx = Array.from(distSel.options).findIndex(o => o.value === String(targetDist));
+                if (idx === -1) {
+                    idx = Array.from(distSel.options).findIndex(o => o.text && (o.text.toLowerCase().includes('malang') || o.text.toLowerCase().includes('surabaya')));
+                }
+                if (idx === -1 && distSel.options.length > 1) {
+                    idx = 1;
+                }
+                if (idx !== -1) {
+                    distSel.selectedIndex = idx;
+                    distSel.dispatchEvent(new Event('change', { bubbles: true }));
+                    if (window.jQuery) window.jQuery(distSel).change().trigger('change');
+                }
+            }
+        }, ketuaData);
+
+        await new Promise(r => setTimeout(r, 1000));
 
         // 7c. Cek Jumlah Anggota yang Sudah Ada di Tabel
         const existingMembers = await page.evaluate(() => {
@@ -673,11 +712,25 @@ async function runAutoBookingFlow() {
         const membersToAdd = memberList.slice(existingMembers);
 
         if (membersToAdd.length > 0) {
-            console.log(`➕ Menambahkan ${membersToAdd.length} anggota (sesuai pendaftaran di DB)...`);
+            console.log(`\n➕ Memulai Pengisian ${membersToAdd.length} Anggota (Detail per Anggota):`);
 
             for (let i = 0; i < membersToAdd.length; i++) {
                 const member = membersToAdd[i];
-                console.log(`   ➕ Anggota ${existingMembers + i + 1}/${memberList.length}: ${member.nama} (NIK: ${member.identityNo})...`);
+                const memberNum = existingMembers + i + 1;
+                console.log(`\n--------------------------------------------------`);
+                console.log(`👤 [ANGGOTA ${memberNum}/${memberList.length}] Processing: ${member.nama}...`);
+                console.log(`   📂 NIK: ${member.identityNo} | Tgl Lahir: ${member.birthdate} | HP: ${member.hp}`);
+
+                console.log(`   🔘 [1/4] Membuka Modal Tambah Anggota ke-${memberNum}...`);
+                
+                await page.evaluate(() => {
+                    const openModal = document.querySelector('#modal_anggota.show, .modal.show');
+                    if (openModal) {
+                        const closeBtn = openModal.querySelector('.close, [data-dismiss="modal"], button.btn-secondary');
+                        if (closeBtn) closeBtn.click();
+                        else openModal.classList.remove('show');
+                    }
+                });
 
                 await page.click('.btn-add').catch(async () => {
                     await page.evaluate(() => {
@@ -688,6 +741,7 @@ async function runAutoBookingFlow() {
 
                 await new Promise(r => setTimeout(r, 1200));
 
+                console.log(`   📝 [2/4] Mengisikan Data Formulir Modal...`);
                 await page.evaluate((m, ketuaHp) => {
                     const modal = document.querySelector('#modal_anggota') || document.querySelector('.modal.show') || document.querySelector('.modal');
                     if (!modal) return;
@@ -758,6 +812,8 @@ async function runAutoBookingFlow() {
                     const hpVal = m.hp || m.familyHp || ketuaHp || '081234567890';
                     const hpInp = modal.querySelector('input[name="hp_member"], input[name="hp"], input[name="no_hp_anggota"], input[name="hp_anggota"], input[name="phone_number"], input[name="no_hp"], input[name="phone"]');
                     if (hpInp) {
+                        hpInp.removeAttribute('disabled');
+                        hpInp.removeAttribute('readonly');
                         setInputValue(hpInp, hpVal);
                     } else {
                         const labels = Array.from(modal.querySelectorAll('label'));
@@ -789,17 +845,23 @@ async function runAutoBookingFlow() {
                     }
                 }, member, ketuaData.hp);
 
-                // Menunggu modal tertutup secara alami sebelum menambah anggota berikutnya
+                console.log(`   💾 [3/4] Mengklik Tombol Simpan Modal...`);
+                await new Promise(r => setTimeout(r, 800));
+
+                console.log(`   ⏳ [4/4] Menunggu Modal Tertutup & Data Tersimpan...`);
                 await page.waitForFunction(() => {
                     const modal = document.querySelector('#modal_anggota') || document.querySelector('.modal.show');
                     if (!modal) return true;
                     const style = window.getComputedStyle(modal);
                     return style.display === 'none' || !modal.classList.contains('show');
-                }, { timeout: 5000 }).catch(() => {});
+                }, { timeout: 4000 }).catch(() => {});
 
+                console.log(`   ✅ [ANGGOTA ${memberNum}/${memberList.length}] SUKSES TERINPUT: ${member.nama}`);
                 await new Promise(r => setTimeout(r, 1000));
             }
+            console.log(`\n==================================================`);
             console.log(`✅ Seluruh ${memberList.length} anggota pendaftaran berhasil diinputkan!`);
+            console.log(`==================================================`);
         } else {
             console.log('✅ Anggota sudah lengkap tersimpan di tabel TNBTS!');
         }
