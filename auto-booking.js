@@ -687,9 +687,20 @@ async function runAutoBookingFlow() {
                     const nameInp = modal.querySelector('input[name="name"], input[name="nama"], input[name="nama_anggota"], input[name="nama_pengikut"]');
                     setInputValue(nameInp, m.nama);
 
-                    // 2. Tanggal Lahir
+                    // 2. Tanggal Lahir (Dukungan Flatpickr Datepicker & Remove Readonly)
                     const bdInp = modal.querySelector('input[name="birthdate"], input[name="tgl_lahir"], input[name="tanggal_lahir"]');
-                    setInputValue(bdInp, m.birthdate);
+                    if (bdInp) {
+                        const bDateVal = m.birthdate;
+                        if (bdInp._flatpickr) {
+                            bdInp._flatpickr.setDate(bDateVal, true);
+                        } else {
+                            bdInp.removeAttribute('readonly');
+                            setInputValue(bdInp, bDateVal);
+                            if (window.jQuery && window.jQuery(bdInp).data && window.jQuery(bdInp).data('flatpickr')) {
+                                window.jQuery(bdInp).data('flatpickr').setDate(bDateVal, true);
+                            }
+                        }
+                    }
 
                     // 3. Jenis Kelamin
                     const genderSel = modal.querySelector('select[name="id_gender"], select[name="gender"], select[name="jenis_kelamin"]');
