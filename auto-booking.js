@@ -157,13 +157,27 @@ async function runAutoBookingFlow() {
         await updateBookingStatus(dbBooking.bookingId, 'processing');
 
         if (dbBooking.targetDate) {
-            rawTargetDate = String(dbBooking.targetDate).split('T')[0];
-            const d = new Date(dbBooking.targetDate);
-            if (!isNaN(d.getTime())) {
-                targetDayNum = d.getDate();
-                const months = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
-                targetMonthText = `${months[d.getMonth()]} ${d.getFullYear()}`;
-                targetDateString = `${d.getDate()} ${months[d.getMonth()]} ${d.getFullYear()}`;
+            rawTargetDate = String(dbBooking.targetDate).split('T')[0].trim();
+            const dateParts = rawTargetDate.split('-');
+            const months = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
+
+            if (dateParts.length === 3) {
+                const year = parseInt(dateParts[0], 10);
+                const monthNum = parseInt(dateParts[1], 10);
+                const day = parseInt(dateParts[2], 10);
+
+                targetDayNum = day;
+                const monthName = months[monthNum - 1] || 'September';
+
+                targetMonthText = `${monthName} ${year}`;
+                targetDateString = `${day} ${monthName} ${year}`;
+            } else {
+                const d = new Date(dbBooking.targetDate);
+                if (!isNaN(d.getTime())) {
+                    targetDayNum = d.getUTCDate();
+                    targetMonthText = `${months[d.getUTCMonth()]} ${d.getUTCFullYear()}`;
+                    targetDateString = `${d.getUTCDate()} ${months[d.getUTCMonth()]} ${d.getUTCFullYear()}`;
+                }
             }
         }
 
