@@ -758,12 +758,18 @@ async function runAutoBookingFlow() {
 
         await new Promise(r => setTimeout(r, 200));
 
-        // 🧹 AUTO-CLEANER: Hapus Otomatis Baris Anggota yang Ganda / Duplikat di Tabel TNBTS
+        // 🧹 AUTO-CLEANER: Hapus Otomatis Baris Anggota yang Ganda / Duplikat di Tabel TNBTS (Anti-429 Rate Limit)
         const cleanDuplicatesOnPage = async () => {
             let hasDuplicates = true;
             let cleanedCount = 0;
 
             while (hasDuplicates) {
+                // Jika terdeteksi Rate Limit 429 dalam 3.5 detik terakhir, berikan jeda aman 3 detik
+                if (Date.now() - last429Time < 3500) {
+                    console.log(`   ⏳ [DELETE RATE LIMIT RECOVERY] Jeda 3 detik untuk memulihkan batas request server...`);
+                    await new Promise(r => setTimeout(r, 3000));
+                }
+
                 const result = await page.evaluate(() => {
                     const rows = Array.from(document.querySelectorAll('table tbody tr'));
                     const seen = new Set();
@@ -804,7 +810,7 @@ async function runAutoBookingFlow() {
                 if (result && result.found) {
                     cleanedCount++;
                     console.log(`   🗑️ [AUTO-DELETE DUPLIKAT] Menghapus data ganda: "${result.name}" dari tabel TNBTS...`);
-                    await new Promise(r => setTimeout(r, 600));
+                    await new Promise(r => setTimeout(r, 800));
 
                     // Tekan OK / Ya / Hapus jika muncul konfirmasi popup modal / SweetAlert
                     await page.evaluate(() => {
@@ -819,7 +825,9 @@ async function runAutoBookingFlow() {
                         ));
                         if (okBtn) okBtn.click();
                     });
-                    await new Promise(r => setTimeout(r, 800));
+
+                    // Jeda aman human-like 1.5 detik per penghapusan untuk mencegah 429 Too Many Requests
+                    await new Promise(r => setTimeout(r, 1500));
                 } else {
                     hasDuplicates = false;
                 }
