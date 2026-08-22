@@ -756,18 +756,19 @@ async function runAutoBookingFlow() {
             const rows = Array.from(document.querySelectorAll('table tbody tr'));
             const validRows = rows.filter(tr => {
                 const txt = tr.innerText.trim();
-                return txt && !txt.includes('No data available') && tr.querySelectorAll('td').length >= 3;
+                return txt && !txt.includes('No data available') && tr.querySelectorAll('td').length >= 2;
             });
             return validRows.length;
         });
 
-        console.log(`👥 Target Anggota dari Pendaftaran DB: ${memberList.length} orang.`);
-        console.log(`👥 Anggota yang sudah tersimpan di tabel/sesi TNBTS: ${existingMembers} orang.`);
+        console.log(`\n==================================================`);
+        console.log(`👥 PROSES INPUT ANGGOTA [${destTitle}]: Target ${memberList.length} Anggota (Sudah tersimpan: ${existingMembers})`);
+        console.log(`==================================================\n`);
 
         const membersToAdd = memberList.slice(existingMembers);
 
         if (membersToAdd.length > 0) {
-            console.log(`\n➕ Memulai Pengisian ${membersToAdd.length} Anggota (Detail per Anggota):`);
+            console.log(`➕ Memulai Pengisian ${membersToAdd.length} Anggota (Detail per Anggota):`);
 
             for (let i = 0; i < membersToAdd.length; i++) {
                 const member = membersToAdd[i];
@@ -779,7 +780,7 @@ async function runAutoBookingFlow() {
                 console.log(`   🔘 [1/4] Membuka Modal Tambah Anggota ke-${memberNum}...`);
                 
                 await page.evaluate(() => {
-                    const openModal = document.querySelector('#modal_anggota.show, .modal.show');
+                    const openModal = document.querySelector('#modal_anggota.show, #modal_pengikut.show, .modal.show');
                     if (openModal) {
                         const closeBtn = openModal.querySelector('.close, [data-dismiss="modal"], button.btn-secondary');
                         if (closeBtn) closeBtn.click();
@@ -789,17 +790,20 @@ async function runAutoBookingFlow() {
 
                 await page.click('.btn-add').catch(async () => {
                     await page.evaluate(() => {
-                        const btn = document.querySelector('.btn-add') || Array.from(document.querySelectorAll('button')).find(b => b.innerText && b.innerText.includes('Tambah'));
+                        const btn = document.querySelector('.btn-add') || 
+                                    document.querySelector('[data-target*="modal"]') ||
+                                    document.querySelector('[data-toggle="modal"]') ||
+                                    Array.from(document.querySelectorAll('button, a')).find(b => b.innerText && (b.innerText.includes('Tambah') || b.innerText.includes('Add')));
                         if (btn) btn.click();
                     });
                 });
 
-                await page.waitForSelector('#modal_anggota.show, .modal.show', { timeout: 2000 }).catch(() => {});
+                await page.waitForSelector('#modal_anggota.show, #modal_pengikut.show, .modal.show', { timeout: 2000 }).catch(() => {});
                 await new Promise(r => setTimeout(r, 150));
 
-                console.log(`   📝 [2/4] Mengisikan Data Formulir Modal...`);
+                console.log(`   📝 [2/4] Mengisikan Data Formulir Modal (${destTitle})...`);
                 await page.evaluate((m, ketuaHp) => {
-                    const modal = document.querySelector('#modal_anggota') || document.querySelector('.modal.show') || document.querySelector('.modal');
+                    const modal = document.querySelector('#modal_anggota, #modal_pengikut, #modal-anggota, .modal.show, .modal');
                     if (!modal) return;
 
                     const setInputValue = (el, val) => {
@@ -901,8 +905,13 @@ async function runAutoBookingFlow() {
                     const countrySel = modal.querySelector('select[name="id_country"], select[name="country"], select[name="negara"]');
                     setSelectValue(countrySel, m.countryId || '99');
 
+                    // 11. Surat Keterangan Sehat (jika ada di modal Ranu Regulo / Semeru)
+                    const docSel = modal.querySelector('select[name="doctor_letter"], select[name="surat_sehat"], select[name="is_doctor_letter"]');
+                    if (docSel) setSelectValue(docSel, '1');
+
                     // Klik Tombol Simpan
                     const submitBtn = modal.querySelector('button[type="submit"]') || 
+                                      modal.querySelector('.btn-primary') ||
                                       Array.from(modal.querySelectorAll('button')).find(b => b.innerText && (b.innerText.includes('Simpan') || b.innerText.includes('Tambah') || b.innerText.includes('Submit')));
                     if (submitBtn) {
                         submitBtn.click();
@@ -914,7 +923,7 @@ async function runAutoBookingFlow() {
 
                 console.log(`   ⏳ [4/4] Menunggu Modal Tertutup & Data Tersimpan...`);
                 await page.waitForFunction(() => {
-                    const modal = document.querySelector('#modal_anggota') || document.querySelector('.modal.show');
+                    const modal = document.querySelector('#modal_anggota, #modal_pengikut, .modal.show');
                     if (!modal) return true;
                     const style = window.getComputedStyle(modal);
                     return style.display === 'none' || !modal.classList.contains('show');
@@ -923,7 +932,7 @@ async function runAutoBookingFlow() {
                 // Verifikasi Jumlah Baris di Tabel TNBTS & Auto Recovery
                 const newTableRowCount = await page.evaluate(() => {
                     const rows = Array.from(document.querySelectorAll('table tbody tr'));
-                    return rows.filter(tr => tr.innerText.trim() && !tr.innerText.includes('No data available') && tr.querySelectorAll('td').length >= 3).length;
+                    return rows.filter(tr => tr.innerText.trim() && !tr.innerText.includes('No data available') && tr.querySelectorAll('td').length >= 2).length;
                 });
 
                 if (newTableRowCount > existingMembers + i) {
