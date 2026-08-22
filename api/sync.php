@@ -83,11 +83,12 @@ try {
     $syncedCount = 0;
 
     $stmtUpsertB = $pdo->prepare("
-        INSERT INTO bookings (booking_id, target_date, arrival_date, status, created_at)
-        VALUES (:b_id, :t_date, :a_date, :status, :created_at)
+        INSERT INTO bookings (booking_id, target_date, arrival_date, organisasi, status, created_at)
+        VALUES (:b_id, :t_date, :a_date, :organisasi, :status, :created_at)
         ON DUPLICATE KEY UPDATE
             target_date = VALUES(target_date),
             arrival_date = VALUES(arrival_date),
+            organisasi = VALUES(organisasi),
             status = VALUES(status)
     ");
 
@@ -129,6 +130,7 @@ try {
             'b_id' => $b['booking_id'],
             't_date' => $b['target_date'],
             'a_date' => $b['arrival_date'],
+            'organisasi' => $b['organisasi'] ?? 'Pecinta Alam Semeru',
             'status' => $b['status'] ?? 'pending',
             'created_at' => $b['created_at'] ?? date('Y-m-d H:i:s')
         ]);

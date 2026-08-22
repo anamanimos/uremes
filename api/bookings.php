@@ -83,12 +83,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $targetDate = $payload['t_dt'];
         $arrivalDate = $payload['a_dt'] ?? date('Y-m-d', strtotime($targetDate . ' +1 day'));
 
+        $organisasi = $payload['o_g'] ?? 'Pecinta Alam Semeru';
+
         // 1. Simpan ke tabel bookings
-        $stmtB = $pdo->prepare("INSERT INTO bookings (booking_id, target_date, arrival_date, status) VALUES (:booking_id, :target_date, :arrival_date, 'pending')");
+        $stmtB = $pdo->prepare("INSERT INTO bookings (booking_id, target_date, arrival_date, organisasi, status) VALUES (:booking_id, :target_date, :arrival_date, :organisasi, 'pending')");
         $stmtB->execute([
             'booking_id' => $bookingId,
             'target_date' => $targetDate,
-            'arrival_date' => $arrivalDate
+            'arrival_date' => $arrivalDate,
+            'organisasi' => $organisasi
         ]);
 
         // 2. Simpan Data Ketua

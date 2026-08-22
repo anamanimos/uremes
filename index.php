@@ -112,6 +112,14 @@
                             <option value="1" selected>Dengan Pendamping</option>
                         </select>
                     </div>
+                    <div>
+                        <label class="form-label-premium">Nama Organisasi</label>
+                        <div class="relative">
+                            <i class="fas fa-sitemap absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"></i>
+                            <input type="text" class="form-input-premium pl-11" id="f_o9r"
+                                placeholder="Contoh: Pecinta Alam Semeru" value="Pecinta Alam Semeru">
+                        </div>
+                    </div>
                 </div>
             </section>
 
@@ -840,7 +848,9 @@
                     });
                 });
 
-                return { b_id: bookingId, t_dt: targetDate, a_dt: arrivalDate, x_c: customer, x_m: members };
+                const orgVal = document.getElementById('f_o9r') ? document.getElementById('f_o9r').value.trim() : 'Pecinta Alam Semeru';
+
+                return { b_id: bookingId, t_dt: targetDate, a_dt: arrivalDate, o_g: orgVal || 'Pecinta Alam Semeru', x_c: customer, x_m: members };
             }
 
             async function finalizeAction(bookings) {

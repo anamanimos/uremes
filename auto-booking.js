@@ -622,14 +622,14 @@ async function runAutoBookingFlow() {
             // 4. Nama Organisasi (input[name="organisasi"])
             const orgInp = document.querySelector('input[name="organisasi"], input[name="nama_organisasi"]');
             if (orgInp) {
-                const orgVal = 'Pecinta Alam Semeru';
+                const orgVal = targetOrg || 'Pecinta Alam Semeru';
                 orgInp.value = orgVal;
                 orgInp.dispatchEvent(new Event('input', { bubbles: true }));
                 orgInp.dispatchEvent(new Event('change', { bubbles: true }));
                 orgInp.dispatchEvent(new Event('blur', { bubbles: true }));
                 if (window.jQuery) window.jQuery(orgInp).trigger('input').trigger('change').trigger('blur');
             }
-        }, rawTargetDate, ketuaData.hp);
+        }, rawTargetDate, dbBooking.organisasi || 'Pecinta Alam Semeru');
 
         await new Promise(r => setTimeout(r, 1000));
 

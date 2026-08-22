@@ -16,12 +16,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         $targetDate = $_POST['target_date'] ?? '';
         $arrivalDate = $_POST['arrival_date'] ?? '';
+        $organisasi = $_POST['organisasi'] ?? 'Pecinta Alam Semeru';
 
         // 1. Update bookings
-        $stmtB = $pdo->prepare("UPDATE bookings SET target_date = :target_date, arrival_date = :arrival_date WHERE booking_id = :booking_id AND deleted_at IS NULL");
+        $stmtB = $pdo->prepare("UPDATE bookings SET target_date = :target_date, arrival_date = :arrival_date, organisasi = :organisasi WHERE booking_id = :booking_id AND deleted_at IS NULL");
         $stmtB->execute([
             'target_date' => $targetDate,
             'arrival_date' => $arrivalDate,
+            'organisasi' => $organisasi,
             'booking_id' => $bookingId
         ]);
 
@@ -190,14 +192,18 @@ $savedDist = $ketua['district_id'] ?? '';
                     <div class="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center"><i class="fas fa-calendar-alt"></i></div>
                     Jadwal Kunjungan
                 </h2>
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
                     <div>
-                        <label class="form-label-premium required-star">Tanggal Berangkat</label>
+                        <label class="form-label-premium required-star">Tanggal Keberangkatan</label>
                         <input type="text" name="target_date" id="target_date" value="<?= htmlspecialchars($booking['target_date']) ?>" class="form-input-premium datepicker">
                     </div>
                     <div>
-                        <label class="form-label-premium required-star">Tanggal Pulang</label>
+                        <label class="form-label-premium required-star">Tanggal Kepulangan</label>
                         <input type="text" name="arrival_date" id="arrival_date" value="<?= htmlspecialchars($booking['arrival_date']) ?>" class="form-input-premium datepicker">
+                    </div>
+                    <div>
+                        <label class="form-label-premium">Nama Organisasi</label>
+                        <input type="text" name="organisasi" id="organisasi" value="<?= htmlspecialchars($booking['organisasi'] ?: 'Pecinta Alam Semeru') ?>" class="form-input-premium" placeholder="Nama Organisasi">
                     </div>
                 </div>
             </section>

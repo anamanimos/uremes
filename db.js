@@ -75,6 +75,7 @@ async function getPendingBooking() {
             bookingId,
             targetDate: booking.target_date,
             arrivalDate: booking.arrival_date,
+            organisasi: booking.organisasi || 'Pecinta Alam Semeru',
             status: booking.status,
             ketua,
             members: memberRows

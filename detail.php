@@ -147,7 +147,7 @@ $distId = $ketua['district_id'] ?: '-';
                     <h2 class="text-lg font-bold text-slate-800 mb-4 flex items-center gap-2">
                         <i class="fas fa-calendar-alt text-brand-500"></i> Jadwal Kunjungan
                     </h2>
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
                         <div>
                             <span class="text-xs font-semibold text-slate-400 uppercase">Tanggal Keberangkatan</span>
                             <p class="text-lg font-bold text-slate-700 mt-1"><i class="fas fa-plane-departure text-brand-500 mr-2"></i><?= htmlspecialchars($booking['target_date']) ?></p>
@@ -155,6 +155,10 @@ $distId = $ketua['district_id'] ?: '-';
                         <div>
                             <span class="text-xs font-semibold text-slate-400 uppercase">Tanggal Kepulangan</span>
                             <p class="text-lg font-bold text-slate-700 mt-1"><i class="fas fa-plane-arrival text-brand-500 mr-2"></i><?= htmlspecialchars($booking['arrival_date']) ?></p>
+                        </div>
+                        <div>
+                            <span class="text-xs font-semibold text-slate-400 uppercase">Nama Organisasi</span>
+                            <p class="text-lg font-bold text-slate-700 mt-1"><i class="fas fa-sitemap text-brand-500 mr-2"></i><?= htmlspecialchars($booking['organisasi'] ?: 'Pecinta Alam Semeru') ?></p>
                         </div>
                     </div>
                 </section>
