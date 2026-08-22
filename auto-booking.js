@@ -707,15 +707,18 @@ async function runAutoBookingFlow() {
                     const idNoInp = modal.querySelector('input[name="identity_no"], input[name="no_identitas"], input[name="nik"], input[name="no_kartu_identitas"]');
                     setInputValue(idNoInp, m.identityNo);
 
-                    // 7. No HP Anggota (input[name="hp"])
+                    // 7. No HP Anggota (Atribut Presisi: name="hp_member")
                     const hpVal = m.hp || m.familyHp || ketuaHp || '081234567890';
-                    const hpInp = modal.querySelector('input[name="hp"], input[name="phone"], input[name="no_hp_anggota"], input[name="hp_anggota"], input[name="phone_number"], input[name="no_hp"]');
+                    const hpInp = modal.querySelector('input[name="hp_member"], input[name="hp"], input[name="no_hp_anggota"], input[name="hp_anggota"], input[name="phone_number"], input[name="no_hp"], input[name="phone"]');
                     if (hpInp) {
                         setInputValue(hpInp, hpVal);
                     } else {
-                        const inputs = Array.from(modal.querySelectorAll('input'));
-                        const targetInp = inputs.find(i => i.name && i.name !== 'family_hp' && (i.name.includes('hp') || i.name.includes('phone') || i.type === 'tel'));
-                        if (targetInp) setInputValue(targetInp, hpVal);
+                        const labels = Array.from(modal.querySelectorAll('label'));
+                        const targetLabel = labels.find(l => l.innerText && l.innerText.toLowerCase().includes('no hp anggota'));
+                        if (targetLabel) {
+                            const inp = targetLabel.parentElement.querySelector('input') || (targetLabel.nextElementSibling ? targetLabel.nextElementSibling.querySelector('input') : null);
+                            if (inp) setInputValue(inp, hpVal);
+                        }
                     }
 
                     // 8. No HP Keluarga (input[name="family_hp"])
