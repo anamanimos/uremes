@@ -62,7 +62,7 @@ async function switchToDestinationTab(page, dest) {
         } catch (e2) {}
     }
 
-    await new Promise(r => setTimeout(r, 1000));
+    await new Promise(r => setTimeout(r, 200));
 
     // 2. Paksa pengaktifan Bootstrap Tab & Class active/show di DOM
     await page.evaluate((btnSel, paneSel) => {
@@ -102,7 +102,7 @@ async function switchToDestinationTab(page, dest) {
         }
     }, tabBtnSelector, tabPaneSelector);
 
-    await new Promise(r => setTimeout(r, 1500));
+    await new Promise(r => setTimeout(r, 300));
 }
 
 /**
@@ -404,7 +404,15 @@ async function runAutoBookingFlow() {
                 if (submitBtn) submitBtn.click();
             }, targetMonthText, jenisKunjungan, destination);
 
-            await new Promise(r => setTimeout(r, 3500));
+            // Tunggu dinamis tabel kuota diperbarui (tanpa sleep statis 3.5 detik)
+            await page.waitForFunction((dest) => {
+                let paneSel = dest === 'ranu-regulo' ? '#pills-three-example2' : '#pills-two-example2';
+                let container = document.querySelector(paneSel) || document.body;
+                const rows = container.querySelectorAll('table tbody tr');
+                return rows.length > 0 && !rows[0].innerText.includes('Loading');
+            }, { timeout: 3500 }, destination).catch(() => {});
+
+            await new Promise(r => setTimeout(r, 200));
 
             // Evaluasi Kuota Tanggal Target dari Tabel Khusus Pane Aktif
             quotaResult = await page.evaluate((tDay, tDateStr, tRawDate, dest) => {
