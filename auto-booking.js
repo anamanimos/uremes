@@ -137,7 +137,8 @@ async function runAutoBookingFlow() {
         hp: '081234567890',
         address: 'Jl. Raya Semeru No. 10',
         gender: '1',
-        identityType: '1'
+        identityType: '1',
+        birthdate: '1990-01-01'
     };
 
     let memberList = [
@@ -188,7 +189,8 @@ async function runAutoBookingFlow() {
                 hp: dbBooking.ketua.hp || ketuaData.hp,
                 address: dbBooking.ketua.address || ketuaData.address,
                 gender: String(dbBooking.ketua.gender_id || 1),
-                identityType: String(dbBooking.ketua.identity_type_id || 1)
+                identityType: String(dbBooking.ketua.identity_type_id || 1),
+                birthdate: formatDateToYYYYMMDD(dbBooking.ketua.birthdate || '1990-01-01')
             };
         }
 
@@ -597,7 +599,7 @@ async function runAutoBookingFlow() {
         await new Promise(r => setTimeout(r, 1000));
 
         // 7b. Isi Data Ketua Kelompok
-        console.log(`👤 Mengisi Data Ketua Kelompok (Nama: ${ketuaData.nama}, Gender: ${ketuaData.gender === '1' ? 'Laki-Laki' : 'Perempuan'}, NIK: ${ketuaData.nik})...`);
+        console.log(`👤 Mengisi Data Ketua Kelompok (Nama: ${ketuaData.nama}, Gender: ${ketuaData.gender === '1' ? 'Laki-Laki' : 'Perempuan'}, NIK: ${ketuaData.nik}, Tgl Lahir: ${ketuaData.birthdate})...`);
         await page.evaluate((k) => {
             const fillVal = (selector, val) => {
                 const el = document.querySelector(selector);
@@ -623,6 +625,21 @@ async function runAutoBookingFlow() {
             fillVal('input[name="address"]', k.address);
             fillVal('input[name="hp"]', k.hp);
             selectVal('select[name="id_country"]', '99');
+
+            // Tanggal Lahir Ketua (Dukungan Flatpickr Datepicker & Remove Readonly)
+            const kBdInp = document.querySelector('input[name="birthdate"], input[name="tgl_lahir"], input[name="tanggal_lahir"]');
+            if (kBdInp) {
+                const bDateVal = k.birthdate || '1990-01-01';
+                if (kBdInp._flatpickr) {
+                    kBdInp._flatpickr.setDate(bDateVal, true);
+                } else {
+                    kBdInp.removeAttribute('readonly');
+                    fillVal('input[name="birthdate"]', bDateVal);
+                    if (window.jQuery && window.jQuery(kBdInp).data && window.jQuery(kBdInp).data('flatpickr')) {
+                        window.jQuery(kBdInp).data('flatpickr').setDate(bDateVal, true);
+                    }
+                }
+            }
         }, ketuaData);
 
         await new Promise(r => setTimeout(r, 1500));
